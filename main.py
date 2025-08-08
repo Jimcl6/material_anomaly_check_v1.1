@@ -20,27 +20,27 @@ DB_CONFIG = {
 # Define material patterns for inspection table mapping
 # Fixed mapping for Frame material inspection data
 FRAME_COLUMN_MAPPING = {
-    'Inspection_1_Minimum ': 'Process_1_Frame_Inspection_1_Minimum_Data',
-    'Inspection_1_Average ': 'Process_1_Frame_Inspection_1_Average_Data',
-    'Inspection_1_Maximum ': 'Process_1_Frame_Inspection_1_Maximum_Data',
-    'Inspection_2_Minimum ': 'Process_1_Frame_Inspection_2_Minimum_Data',
-    'Inspection_2_Average ': 'Process_1_Frame_Inspection_2_Average_Data',
-    'Inspection_2_Maximum ': 'Process_1_Frame_Inspection_2_Maximum_Data',
-    'Inspection_3_Minimum ': 'Process_1_Frame_Inspection_3_Minimum_Data',
-    'Inspection_3_Average ': 'Process_1_Frame_Inspection_3_Average_Data',
-    'Inspection_3_Maximum ': 'Process_1_Frame_Inspection_3_Maximum_Data',
-    'Inspection_4_Minimum ': 'Process_1_Frame_Inspection_4_Minimum_Data',
-    'Inspection_4_Average ': 'Process_1_Frame_Inspection_4_Average_Data',
-    'Inspection_4_Maximum ': 'Process_1_Frame_Inspection_4_Maximum_Data',
-    'Inspection_5_Minimum ': 'Process_1_Frame_Inspection_5_Minimum_Data',
-    'Inspection_5_Average ': 'Process_1_Frame_Inspection_5_Average_Data',
-    'Inspection_5_Maximum ': 'Process_1_Frame_Inspection_5_Maximum_Data',
-    'Inspection_6_Minimum ': 'Process_1_Frame_Inspection_6_Minimum_Data',
-    'Inspection_6_Average ': 'Process_1_Frame_Inspection_6_Average_Data',
-    'Inspection_6_Maximum ': 'Process_1_Frame_Inspection_6_Maximum_Data',
-    'Inspection_7_Minimum ': 'Process_1_Frame_Inspection_7_Average_Data',  # Updated mapping
-    'Inspection_7_Average ': 'Process_1_Frame_Inspection_6_Minimum_Data',  # Updated mapping
-    'Inspection_7_Maximum ': 'Process_1_Frame_Inspection_7_Maximum_Data'
+    'Inspection_1_Minimum ': 'Inspection_1_Minimum_Data',
+    'Inspection_1_Average ': 'Inspection_1_Average_Data',
+    'Inspection_1_Maximum ': 'Inspection_1_Maximum_Data',
+    'Inspection_2_Minimum ': 'Inspection_2_Minimum_Data',
+    'Inspection_2_Average ': 'Inspection_2_Average_Data',
+    'Inspection_2_Maximum ': 'Inspection_2_Maximum_Data',
+    'Inspection_3_Minimum ': 'Inspection_3_Minimum_Data',
+    'Inspection_3_Average ': 'Inspection_3_Average_Data',
+    'Inspection_3_Maximum ': 'Inspection_3_Maximum_Data',
+    'Inspection_4_Minimum ': 'Inspection_4_Minimum_Data',
+    'Inspection_4_Average ': 'Inspection_4_Average_Data',
+    'Inspection_4_Maximum ': 'Inspection_4_Maximum_Data',
+    'Inspection_5_Minimum ': 'Inspection_5_Minimum_Data',
+    'Inspection_5_Average ': 'Inspection_5_Average_Data',
+    'Inspection_5_Maximum ': 'Inspection_5_Maximum_Data',
+    'Inspection_6_Minimum ': 'Inspection_6_Minimum_Data',
+    'Inspection_6_Average ': 'Inspection_6_Average_Data',
+    'Inspection_6_Maximum ': 'Inspection_6_Maximum_Data',
+    'Inspection_7_Minimum ': 'Inspection_7_Average_Data',  # Updated mapping
+    'Inspection_7_Average ': 'Inspection_6_Minimum_Data',  # Updated mapping
+    'Inspection_7_Maximum ': 'Inspection_7_Maximum_Data'
 }
 
 material_patterns = {
@@ -786,8 +786,8 @@ def normalize_inspection_columns(inspection_df):
     
     # Enhanced inspection type mapping with more flexible detection
     inspection_strategies = {
-        '1': {},
-        '2': {},
+        '1': {'patterns': r'.*_1_.*'},
+        '2': {'patterns': r'.*_2_.*'},
         '3': {
             'type': 'Resistance',
             'keywords': ['resistance', 'resist', 'ohm', 'impedance', 'electrical', 'conductivity', 'continuity'],
@@ -803,8 +803,8 @@ def normalize_inspection_columns(inspection_df):
             'keywords': ['dimension', 'dim', 'size', 'measurement', 'length', 'width', 'height', 'thickness', 'diameter', 'distance', 'clearance'],
             'patterns': [r'.*_5_.*', r'.*dimension.*', r'.*size.*', r'.*clearance.*', r'.*gap.*', r'.*spacing.*']
         },
-        '6': {},
-        '7': {},
+        '6': {'patterns': r'.*_6_.*'},
+        '7': {'patterns': r'.*_7_.*'},
         '10': {
             'type': 'Pull_Test',
             'keywords': ['pull', 'test', 'pulltest', 'tensile', 'force', 'strength', 'load', 'breaking'],
