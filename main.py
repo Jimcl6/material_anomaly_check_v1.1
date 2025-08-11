@@ -20,53 +20,68 @@ DB_CONFIG = {
 # Define material patterns for inspection table mapping
 # Fixed mapping for Frame material inspection data
 FRAME_COLUMN_MAPPING = {
-    'Inspection_1_Minimum ': 'Inspection_1_Minimum_Data',
-    'Inspection_1_Average ': 'Inspection_1_Average_Data',
-    'Inspection_1_Maximum ': 'Inspection_1_Maximum_Data',
-    'Inspection_2_Minimum ': 'Inspection_2_Minimum_Data',
-    'Inspection_2_Average ': 'Inspection_2_Average_Data',
-    'Inspection_2_Maximum ': 'Inspection_2_Maximum_Data',
-    'Inspection_3_Minimum ': 'Inspection_3_Minimum_Data',
-    'Inspection_3_Average ': 'Inspection_3_Average_Data',
-    'Inspection_3_Maximum ': 'Inspection_3_Maximum_Data',
-    'Inspection_4_Minimum ': 'Inspection_4_Minimum_Data',
-    'Inspection_4_Average ': 'Inspection_4_Average_Data',
-    'Inspection_4_Maximum ': 'Inspection_4_Maximum_Data',
-    'Inspection_5_Minimum ': 'Inspection_5_Minimum_Data',
-    'Inspection_5_Average ': 'Inspection_5_Average_Data',
-    'Inspection_5_Maximum ': 'Inspection_5_Maximum_Data',
-    'Inspection_6_Minimum ': 'Inspection_6_Minimum_Data',
-    'Inspection_6_Average ': 'Inspection_6_Average_Data',
-    'Inspection_6_Maximum ': 'Inspection_6_Maximum_Data',
-    'Inspection_7_Minimum ': 'Inspection_7_Average_Data',  # Updated mapping
-    'Inspection_7_Average ': 'Inspection_6_Minimum_Data',  # Updated mapping
-    'Inspection_7_Maximum ': 'Inspection_7_Maximum_Data'
+    'Inspection_1_Minimum': 'Inspection_1_Minimum',
+    'Inspection_1_Average': 'Inspection_1_Average',
+    'Inspection_1_Maximum': 'Inspection_1_Maximum',
+    'Inspection_2_Minimum': 'Inspection_2_Minimum',
+    'Inspection_2_Average': 'Inspection_2_Average',
+    'Inspection_2_Maximum': 'Inspection_2_Maximum',
+    'Inspection_3_Minimum': 'Inspection_3_Minimum',
+    'Inspection_3_Average': 'Inspection_3_Average',
+    'Inspection_3_Maximum': 'Inspection_3_Maximum',
+    'Inspection_4_Minimum': 'Inspection_4_Minimum',
+    'Inspection_4_Average': 'Inspection_4_Average',
+    'Inspection_4_Maximum': 'Inspection_4_Maximum',
+    'Inspection_5_Minimum': 'Inspection_5_Minimum',
+    'Inspection_5_Average': 'Inspection_5_Average',
+    'Inspection_5_Maximum': 'Inspection_5_Maximum',
+    'Inspection_6_Minimum': 'Inspection_6_Minimum',
+    'Inspection_6_Average': 'Inspection_6_Average',
+    'Inspection_6_Maximum': 'Inspection_6_Maximum',
+    'Inspection_7_Minimum': 'Inspection_7_Minimum',
+    'Inspection_7_Average': 'Inspection_7_Average',
+    'Inspection_7_Maximum': 'Inspection_7_Maximum'
 }
 
 material_patterns = {
     'Em2p': {
         'prefix': 'Em2p',
-        'inspection_table': 'em0580106p_inspection'
+        'inspection_table': 'em0580106p_inspection',
+        'code_pattern': 'EM0580106P'
     },
     'Em3p': {
         'prefix': 'Em3p',
-        'inspection_table': 'em0580107p_inspection'
+        'inspection_table': 'em0580107p_inspection',
+        'code_pattern': 'EM0580107P'
     },
     'Frame': {
         'prefix': 'Frame',
-        'inspection_table': 'fm05000102_inspection'
+        'inspection_table': 'fm05000102_inspection',
+        'code_pattern': ['FM05000102', 'FM05000102-01A']
     },
     'Casing_Block': {
         'prefix': 'Casing_Block',
-        'inspection_table': 'csb6400802_inspection'
+        'inspection_table': 'csb6400802_inspection',
+        'code_pattern': 'CSB6400802'
     },
     'Rod_Blk': {
         'prefix': 'Rod_Blk',
-        'inspection_table': 'rdb5200200_inspection'
+        'inspection_table': 'rdb5200200_inspection',
+        'code_pattern': 'RDB5200200',
+        'inspection_columns': {
+            'Inspection_3': 'Thickness',
+            'Inspection_4': 'Width',
+            'Inspection_5': 'Length'
+        }
     },
     'Df_Blk': {
         'prefix': 'Df_Blk',
-        'inspection_table': 'dfb6600600_inspection'
+        'inspection_table': 'dfb6600600_inspection',
+        'code_pattern': 'DFB6600600',
+        'inspection_columns': {
+            'Inspection_3': 'Height',
+            'Inspection_4': 'Depth'
+        }
     }
 }
 
@@ -276,7 +291,7 @@ def get_process_data_for_materials(process_sn_list, target_materials, csv_date=N
 
 def map_frame_inspection_columns(inspection_df):
     """
-    Map frame inspection columns to the expected database column names.
+    Map frame inspection columns to the expected database column names with enhanced logging.
     
     Args:
         inspection_df: DataFrame with inspection data from fm05000102_inspection table
@@ -284,19 +299,73 @@ def map_frame_inspection_columns(inspection_df):
     Returns:
         DataFrame with mapped column names
     """
+    print("\n=== MAPPING FRAME INSPECTION COLUMNS ===")
     if inspection_df is None or inspection_df.empty:
+        print("[WARN] Input DataFrame is None or empty")
         return inspection_df
         
-    # Use the global FRAME_COLUMN_MAPPING
+    print(f"[INFO] Original columns ({len(inspection_df.columns)}): {list(inspection_df.columns)}")
+    print("[INFO] Sample data from first row:")
+    if len(inspection_df) > 0:
+        for col in inspection_df.columns:
+            try:
+                val = inspection_df[col].iloc[0]
+                print(f"  {col}: {val} (type: {type(val).__name__})")
+            except:
+                print(f"  {col}: <error reading value>")
     
     # Create a new DataFrame with mapped columns
     mapped_df = inspection_df.copy()
     
+    # Track successful mappings
+    mappings_applied = []
+    
+    # First, look for Frame inspection columns 1, 2, 6, 7
+    critical_inspections = ['1', '2', '6', '7']
+    print("\n[DEBUG] Checking for critical Frame inspections:", critical_inspections)
+    
+    for insp_num in critical_inspections:
+        # Look for columns matching various patterns
+        patterns = [
+            f'Inspection_{insp_num}_',
+            f'Frame_Inspection_{insp_num}',
+            f'Frame_{insp_num}_',
+            f'_{insp_num}_Value',
+            f'_{insp_num}_Data'
+        ]
+        
+        found_cols = []
+        for pattern in patterns:
+            matching_cols = [col for col in mapped_df.columns if pattern in col]
+            found_cols.extend(matching_cols)
+        
+        if found_cols:
+            print(f"[DEBUG] Found columns for Inspection {insp_num}:", found_cols)
+        else:
+            print(f"[WARN] No columns found for Inspection {insp_num}")
+    
+    # Apply the global FRAME_COLUMN_MAPPING
+    print("\n[DEBUG] Applying FRAME_COLUMN_MAPPING...")
     for old_col, new_col in FRAME_COLUMN_MAPPING.items():
         if old_col in mapped_df.columns:
-            mapped_df[new_col] = mapped_df[old_col]
-            mapped_df.drop(columns=[old_col], inplace=True)
-            
+            try:
+                mapped_df[new_col] = mapped_df[old_col]
+                mapped_df.drop(columns=[old_col], inplace=True)
+                mappings_applied.append((old_col, new_col))
+                print(f"[SUCCESS] Mapped {old_col} -> {new_col}")
+                
+                # Show sample values
+                if len(mapped_df) > 0:
+                    val = mapped_df[new_col].iloc[0]
+                    print(f"  Sample value: {val} (type: {type(val).__name__})")
+            except Exception as e:
+                print(f"[ERROR] Failed to map {old_col} -> {new_col}: {str(e)}")
+        else:
+            print(f"[WARN] Column not found: {old_col}")
+    
+    print(f"\n[SUMMARY] Successfully applied {len(mappings_applied)} mappings")
+    print(f"[INFO] Final columns ({len(mapped_df.columns)}): {list(mapped_df.columns)}")
+    
     return mapped_df
 
 def get_material_inspection_data(material_results):
@@ -346,33 +415,38 @@ def get_material_inspection_data(material_results):
         for material_code, lot_numbers in material_lots.items():
             # Determine the correct inspection table based on material type
             processed_material_code = material_code
-            if material_code.startswith('FM') and material_code.endswith('-01A'):
-                # Frame material
-                processed_material_code = material_code[:-4]  # Remove -01A suffix
+            if material_code.startswith('FM'):
+                # Frame material - handle both with and without -01A suffix
+                processed_material_code = material_code[:-4] if material_code.endswith('-01A') else material_code
                 print(f"  [FRAME] Frame material code processed: {material_code} -> {processed_material_code}")
-            elif material_code == 'EM0580106P':
-                # Em2p material
-                processed_material_code = 'em0580106p'
-                print(f"  [EM2P] Em2p material code processed: {material_code}")
-            elif material_code == 'EM0580107P':
-                # Em3p material
-                processed_material_code = 'em0580107p'
-                print(f"  [EM3P] Em3p material code processed: {material_code}")
-            elif material_code == 'CSB6400802':
-                # Casing Block material
-                processed_material_code = 'csb6400802'
-                print(f"  [CASING] Casing Block material code processed: {material_code}")
-            elif material_code == 'RDB5200200':
-                # Rod Block material
-                processed_material_code = 'rdb5200200'
-                print(f"  [ROD] Rod Block material code processed: {material_code}")
-            elif material_code == 'DFB6600600':
-                # Df Block material
-                processed_material_code = 'dfb6600600'
-                print(f"  [DF] Df Block material code processed: {material_code}")
+            else:
+                # For all other materials, convert to lowercase and ensure proper format
+                material_type = ''
+                if material_code == 'EM0580106P':
+                    material_type = 'EM2P'
+                    processed_material_code = 'em0580106p'
+                elif material_code == 'EM0580107P':
+                    material_type = 'EM3P'
+                    processed_material_code = 'em0580107p'
+                elif material_code == 'CSB6400802':
+                    material_type = 'CASING'
+                    processed_material_code = 'csb6400802'
+                elif material_code == 'RDB5200200':
+                    material_type = 'ROD'
+                    processed_material_code = material_code.lower()
+                elif material_code == 'DFB6600600':
+                    material_type = 'DF'
+                    processed_material_code = material_code.lower()
+                
+                if material_type:
+                    print(f"  [{material_type}] {material_type} material code processed: {material_code} -> {processed_material_code}")
             
-            # Convert processed material code to lowercase for table name
+            # Generate table name with proper format
             table_name = f"{processed_material_code.lower()}_inspection"
+            
+            # Verify table name matches expected pattern
+            if not any(mat_info['inspection_table'] == table_name for mat_info in material_patterns.values()):
+                print(f"  [WARN] Generated table name {table_name} does not match any known inspection table")
             inspection_results[material_code] = {}
             
             print(f"\nProcessing material: {material_code}")
@@ -1211,9 +1285,13 @@ def perform_deviation_calculations(database_df, inspection_df):
     
     # Add explicit mapping between inspection numbers and their types
     inspection_type_mapping = {
+        '1': 'Dimension',  # Frame inspection types
+        '2': 'Dimension',
         '3': 'Resistance',
         '4': 'Dimension',
         '5': 'Dimension',
+        '6': 'Dimension',
+        '7': 'Dimension',
         '10': 'Pull_Test'
     }
     
@@ -1265,7 +1343,107 @@ def perform_deviation_calculations(database_df, inspection_df):
                         possible_patterns = []
                         
                         # Add material-specific patterns
-                        if inspection_num == '10':
+                        if material_name == 'Frame':
+                            # For Frame material, add comprehensive inspection patterns
+                            if inspection_num in ['1', '2', '6', '7']:
+                                # Special handling for Frame inspections 1, 2, 6, 7
+                                print(f"\n[DEBUG] Processing Frame inspection {inspection_num}")
+                                
+                                # Add comprehensive patterns for Frame inspections
+                                possible_patterns.extend([
+                                    # Database patterns
+                                    f'Process_{process_num}_{material_name}_Inspection_{inspection_num}_{data_type}_Data',
+                                    f'Process_{process_num}_{material_name}_Inspection_{inspection_num}_Data',
+                                    # Direct Frame patterns
+                                    f'Frame_Inspection_{inspection_num}_{data_type}',
+                                    f'Frame_Inspection_{inspection_num}_Data',
+                                    # Basic inspection patterns
+                                    f'Inspection_{inspection_num}_{data_type}',
+                                    f'Inspection_{inspection_num}_Data',
+                                    # Additional Frame-specific patterns
+                                    f'Process_{process_num}_Frame_{inspection_num}_{data_type}',
+                                    f'Frame_{inspection_num}_{data_type}',
+                                    f'Frame_{inspection_num}_Value',
+                                    f'Inspection_{inspection_num}_Value',
+                                    # Dimension-specific patterns
+                                    f'Frame_{inspection_num}_Dimension_{data_type}',
+                                    f'Inspection_{inspection_num}_Dimension_{data_type}',
+                                    # Direct value patterns
+                                    f'Frame_{inspection_num}',
+                                    f'Inspection_{inspection_num}',
+                                    # Additional patterns for Frame material
+                                    f'Process_{process_num}_Frame_{inspection_num}_{data_type}_Data',
+                                    f'Frame_{inspection_num}_{data_type}_Data',
+                                    f'Frame_{inspection_num}_Dimension',
+                                    f'Frame_{inspection_num}_Measurement',
+                                    # Patterns with underscores
+                                    f'Process_{process_num}_Frame_Inspection_{inspection_num}',
+                                    f'Frame_Inspection_{inspection_num}',
+                                    f'Frame_{inspection_num}_Inspection',
+                                    f'Inspection_{inspection_num}_Frame'
+                                ])
+                                print(f"[DEBUG] Added special patterns for Frame inspection {inspection_num}")
+                                
+                                # Add any matching patterns from other materials
+                                if material_name == 'Frame':
+                                    for other_material in ['Em2p', 'Em3p', 'Casing_Block', 'Rod_Blk', 'Df_Blk']:
+                                        possible_patterns.extend([
+                                            f'Process_{process_num}_{other_material}_Inspection_{inspection_num}_{data_type}_Data',
+                                            f'{other_material}_Inspection_{inspection_num}_{data_type}',
+                                            f'{other_material}_{inspection_num}_{data_type}'
+                                        ])
+                            else:
+                                # Standard patterns for other inspections
+                                possible_patterns.extend([
+                                    # Database patterns with explicit data types
+                                    f'Process_{process_num}_{material_name}_Inspection_{inspection_num}_{data_type}_Data',
+                                    f'Process_{process_num}_{material_name}_Inspection_{inspection_num}_Average_Data',
+                                    f'Process_{process_num}_{material_name}_Inspection_{inspection_num}_Minimum_Data',
+                                    f'Process_{process_num}_{material_name}_Inspection_{inspection_num}_Maximum_Data',
+                                    
+                                    # Inspection table patterns with explicit data types
+                                    f'Inspection_{inspection_num}_{data_type}',
+                                    f'Inspection_{inspection_num}_Minimum',
+                                    f'Inspection_{inspection_num}_Average',
+                                    f'Inspection_{inspection_num}_Maximum',
+                                    
+                                    # Inspection type patterns
+                                    f'Inspection_{inspection_num}_{inspection_type}_{data_type}',
+                                    f'Inspection_{inspection_num}_{inspection_type}_Minimum',
+                                    f'Inspection_{inspection_num}_{inspection_type}_Average',
+                                    f'Inspection_{inspection_num}_{inspection_type}_Maximum',
+                                    
+                                    # Frame-specific patterns
+                                    f'Process_{process_num}_Frame_Inspection_{inspection_num}_{data_type}',
+                                    f'Process_{process_num}_Frame_Inspection_{inspection_num}_Data',
+                                    f'Frame_Inspection_{inspection_num}_{data_type}',
+                                    f'Frame_Inspection_{inspection_num}_Data'
+                                ])
+                            
+                            print(f"    [DEBUG] Frame patterns for inspection {inspection_num}:")
+                            for pattern in possible_patterns[-5:]:  # Show last 5 patterns added
+                                print(f"      - {pattern}")
+                            print(f"    [DEBUG] Frame patterns for inspection {inspection_num}: {possible_patterns}")
+                            
+                            # For Frame material, ensure all inspection numbers are processed
+                            if inspection_num in ['1', '2', '6', '7']:
+                                print(f"    [DEBUG] Processing additional Frame inspection {inspection_num}")
+                                # Add specific patterns for these inspection numbers
+                                possible_patterns.extend([
+                                    f'Process_{process_num}_Frame_Inspection_{inspection_num}',
+                                    f'Inspection_{inspection_num}',
+                                    f'Frame_Inspection_{inspection_num}',
+                                    # Additional patterns for direct value access
+                                    f'Frame_{inspection_num}_Value',
+                                    f'Inspection_{inspection_num}_Value',
+                                    f'Process_{process_num}_Frame_{inspection_num}',
+                                    # Patterns with measurement types
+                                    f'Frame_{inspection_num}_Dimension',
+                                    f'Inspection_{inspection_num}_Dimension',
+                                    f'Frame_{inspection_num}_Measurement',
+                                    f'Inspection_{inspection_num}_Measurement'
+                                ])
+                        elif inspection_num == '10':
                             possible_patterns.extend([
                                 f'Process_{process_num}_{material_name}_Inspection_{inspection_num}_Pull_Test',
                                 f'Inspection_{inspection_num}_Pull_Test'
@@ -1629,6 +1807,7 @@ def extract_material_codes_from_inspection_data(inspection_df):
 def filter_deviation_data_by_material(deviation_df, material_code):
     """
     Filter deviation results to only include rows that match the specified material code.
+    Enhanced logging for Frame material inspection debugging.
     
     Args:
         deviation_df: DataFrame with deviation calculations
@@ -1637,17 +1816,19 @@ def filter_deviation_data_by_material(deviation_df, material_code):
     Returns:
         Filtered DataFrame containing only deviation data for the specified material
     """
+    print(f"\n=== FILTERING DEVIATION DATA FOR {material_code} ===")
     if deviation_df is None or deviation_df.empty:
+        print("[WARN] Input DataFrame is None or empty")
         return pd.DataFrame()
     
-    # Enhanced material pattern mapping based on the sample data
+    # Enhanced material pattern mapping with explicit Frame patterns
     material_patterns = {
         'EM0580106P': ['Em2p'],
         'EM0580107P': ['Em3p'],
-        'FM05000102': ['Frame'],
-        'FM05000102-01A': ['Frame'],  # Handle Frame with suffix
+        'FM05000102': ['Frame', 'FM', 'Frame_Inspection'],  # Added variations
+        'FM05000102-01A': ['Frame', 'FM', 'Frame_Inspection'],  # Added variations
         'CSB6400802': ['Casing_Block'],
-        'EM0660046P': ['Em2p', 'Em3p'],  # Could match multiple patterns
+        'EM0660046P': ['Em2p', 'Em3p'],
         'RDB5200200': ['Rod_Blk'],
         'DFB6600600': ['Df_Blk']
     }
@@ -1694,8 +1875,32 @@ def filter_deviation_data_by_material(deviation_df, material_code):
         # If still no match, try matching based on material code in column name
         if not match_found:
             # Try to match material code pattern (e.g., FM05000102, EM0580106P)
-            if material_code.startswith('FM') and ('FM' in column_name or 'Frame' in column_name):
-                match_found = True
+            if material_code.startswith('FM'):
+                # For Frame material, match both Process_#_Frame and direct Inspection patterns
+                frame_patterns = [
+                    'FM', 'Frame',
+                    r'Process_\d+_Frame_Inspection_[1-7]',
+                    r'Inspection_[1-7]_(Minimum|Maximum|Average)',
+                    r'Process_\d+_Frame_Inspection_[1-7]_Data',
+                    r'Frame_Inspection_[1-7]',
+                    r'Inspection_[1-7]',
+                    # Additional patterns for Frame inspections
+                    r'Process_\d+_Frame_Inspection_\d+_(Maximum|Minimum|Average)',
+                    r'Frame_Inspection_\d+_(Maximum|Minimum|Average)',
+                    r'Inspection_\d+_(Maximum|Minimum|Average)',
+                    # Patterns for specific inspection numbers
+                    r'Process_\d+_Frame_Inspection_(1|2|3|4|5|6|7)',
+                    r'Frame_Inspection_(1|2|3|4|5|6|7)',
+                    r'Inspection_(1|2|3|4|5|6|7)'
+                ]
+                match_found = any(re.search(pattern, column_name) for pattern in frame_patterns)
+                if match_found:
+                    print(f"    [DEBUG] Frame match found for column: {column_name}")
+                    # For Frame material, ensure we capture all inspection numbers
+                    insp_match = re.search(r'Inspection_(\d+)', column_name)
+                    if insp_match:
+                        insp_num = insp_match.group(1)
+                        print(f"    [DEBUG] Found Frame inspection number: {insp_num}")
             elif material_code.startswith('EM'):
                 if '0580106' in material_code and ('EM0580106P' in column_name or 'Em2p' in column_name):
                     match_found = True
@@ -1731,6 +1936,8 @@ def create_material_sheet_data(deviation_df, material_code, inspection_df):
     Returns:
         DataFrame formatted for material sheet
     """
+    print(f"\n[DEBUG] Creating material sheet data for {material_code}")
+    print(f"Inspection DataFrame columns: {list(inspection_df.columns)}")
     if deviation_df.empty:
         return pd.DataFrame()
     
@@ -1753,40 +1960,96 @@ def create_material_sheet_data(deviation_df, material_code, inspection_df):
         # Get the inspection value from the material's inspection data
         inspection_value = ''
         if material_inspection_data is not None:
-            # For Frame material, use the exact mapping from fm05000102_inspection table
-            if material_code.startswith('FM') and (material_code == 'FM05000102' or material_code.endswith('-01A')):
+            # Get material info from patterns
+            material_info = None
+            for mat_name, mat_info in material_patterns.items():
+                if isinstance(mat_info['code_pattern'], list):
+                    if material_code in mat_info['code_pattern']:
+                        material_info = mat_info
+                        break
+                elif material_code == mat_info['code_pattern']:
+                    material_info = mat_info
+                    break
+            
+            # For Frame material, ensure we process all inspection numbers
+            if material_code.startswith('FM'):
+                print(f"[DEBUG] Processing Frame inspection data")
+                # Check both database and inspection columns
+                for insp_num in range(1, 8):  # Process inspections 1-7
+                    insp_str = str(insp_num)
+                    # Look for inspection columns in both formats
+                    db_patterns = [
+                        f'Process_1_Frame_Inspection_{insp_str}',
+                        f'Inspection_{insp_str}',
+                        f'Frame_Inspection_{insp_str}'
+                    ]
+                    for pattern in db_patterns:
+                        matching_cols = [col for col in material_inspection_data.index if pattern in col]
+                        if matching_cols:
+                            print(f"[DEBUG] Found matching columns for inspection {insp_str}: {matching_cols}")
+            
+            if material_info:
                 # Get the original inspection column name
                 db_col = row.get('Column', '')
-                match = re.search(r'(Inspection_\d+_(?:Maximum|Minimum|Average))', db_col)
-                if match:
-                    inspection_col = match.group(1)
-                    # Get the mapped column name from our global mapping
-                    mapped_col = FRAME_COLUMN_MAPPING.get(inspection_col)
-                    if mapped_col and mapped_col in material_inspection_data:
+                
+                # For Frame material
+                if material_info['prefix'] == 'Frame':
+                    match = re.search(r'(Inspection_\d+_(?:Maximum|Minimum|Average))', db_col)
+                    if match:
+                        inspection_col = match.group(1)
+                        mapped_col = FRAME_COLUMN_MAPPING.get(inspection_col)
+                        if mapped_col and mapped_col in material_inspection_data:
+                            try:
+                                value = material_inspection_data[mapped_col]
+                                if pd.notna(value):
+                                    numeric_value = pd.to_numeric(value)
+                                    inspection_value = float(numeric_value)
+                                else:
+                                    print(f"  [WARN] NaN value found for mapped column {mapped_col}")
+                            except (ValueError, TypeError) as e:
+                                print(f"  [WARN] Could not convert value '{value}' to numeric for mapped column {mapped_col}: {e}")
+                
+                # For RDB and DFB materials with specific inspection column mappings
+                elif 'inspection_columns' in material_info:
+                    match = re.search(r'Inspection_(\d+)_(?:Maximum|Minimum|Average)', db_col)
+                    if match:
+                        insp_num = match.group(1)
+                        insp_key = f'Inspection_{insp_num}'
+                        if insp_key in material_info['inspection_columns']:
+                            measurement_type = material_info['inspection_columns'][insp_key]
+                            # Try both original and mapped column names
+                            possible_cols = [
+                                row.get('Matched_Inspection_Column'),
+                                f'Inspection_{insp_num}_{measurement_type}_Average',
+                                f'Inspection_{insp_num}_{measurement_type}_Minimum',
+                                f'Inspection_{insp_num}_{measurement_type}_Maximum'
+                            ]
+                            for col in possible_cols:
+                                if col and col in material_inspection_data:
+                                    try:
+                                        value = material_inspection_data[col]
+                                        if pd.notna(value):
+                                            numeric_value = pd.to_numeric(value)
+                                            inspection_value = float(numeric_value)
+                                            print(f"  [SUCCESS] Found value in column {col}")
+                                            break
+                                    except (ValueError, TypeError) as e:
+                                        print(f"  [WARN] Could not convert value from column {col}: {e}")
+                                        continue
+                
+                # For other materials, use the matched column directly
+                else:
+                    matched_col = row.get('Matched_Inspection_Column')
+                    if matched_col and matched_col in material_inspection_data:
                         try:
-                            value = material_inspection_data[mapped_col]
-
-
+                            value = material_inspection_data[matched_col]
                             if pd.notna(value):
                                 numeric_value = pd.to_numeric(value)
                                 inspection_value = float(numeric_value)
                             else:
-                                print(f"  [WARN] NaN value found for mapped column {mapped_col}")
+                                print(f"  [WARN] NaN value found for column {matched_col}")
                         except (ValueError, TypeError) as e:
-                            print(f"  [WARN] Could not convert value '{value}' to numeric for mapped column {mapped_col}: {e}")
-            else:
-                # For other materials, use the matched column directly
-                matched_col = row.get('Matched_Inspection_Column')
-                if matched_col and matched_col in material_inspection_data:
-                    try:
-                        value = material_inspection_data[matched_col]
-                        if pd.notna(value):
-                            numeric_value = pd.to_numeric(value)
-                            inspection_value = float(numeric_value)
-                        else:
-                            print(f"  [WARN] NaN value found for column {matched_col}")
-                    except (ValueError, TypeError) as e:
-                        print(f"  [WARN] Could not convert value '{value}' to numeric for column {matched_col}: {e}")
+                            print(f"  [WARN] Could not convert value '{value}' to numeric for column {matched_col}: {e}")
         
         # Convert database average to numeric
         db_avg = row.get('Database_Average', '')
@@ -1797,15 +2060,42 @@ def create_material_sheet_data(deviation_df, material_code, inspection_df):
             print(f"  [WARN] Could not convert database average '{db_avg}' to numeric: {e}")
             db_avg = ''
 
-        # For Frame material, use the mapped column name in the output
+        # For Frame material, ensure all inspection columns are included
         if material_code.startswith('FM') and (material_code == 'FM05000102' or material_code.endswith('-01A')):
             db_col = row.get('Column', '')
-            match = re.search(r'Inspection_(\d+)_(Maximum|Minimum|Average)', db_col)
-            if match:
-                insp_num, data_type = match.groups()
-                matched_col = f'Inspection_{insp_num}_{data_type}'
-            else:
+            matched_col = None
+            
+            # Try multiple patterns to match Frame inspection columns
+            patterns = [
+                # Process table pattern
+                (r'Process_\d+_Frame_Inspection_(\d+)_(Maximum|Minimum|Average)',
+                 lambda m: f'Inspection_{m.group(1)}_{m.group(2)}'),
+                
+                # Direct inspection pattern
+                (r'Inspection_(\d+)_(Maximum|Minimum|Average)',
+                 lambda m: f'Inspection_{m.group(1)}_{m.group(2)}'),
+                
+                # Frame-specific pattern
+                (r'Frame_Inspection_(\d+)_(Maximum|Minimum|Average)',
+                 lambda m: f'Inspection_{m.group(1)}_{m.group(2)}'),
+                
+                # Simple inspection number pattern
+                (r'_(\d+)_(Maximum|Minimum|Average)',
+                 lambda m: f'Inspection_{m.group(1)}_{m.group(2)}')
+            ]
+            
+            # Try each pattern
+            for pattern, formatter in patterns:
+                match = re.search(pattern, db_col)
+                if match:
+                    matched_col = formatter(match)
+                    print(f"[DEBUG] Frame material mapping: {db_col} -> {matched_col} (using pattern: {pattern})")
+                    break
+            
+            # If no pattern matched, use the original matched column
+            if not matched_col:
                 matched_col = row.get('Matched_Inspection_Column', '')
+                print(f"[DEBUG] Frame material mapping: Using original matched column: {matched_col}")
         else:
             matched_col = row.get('Matched_Inspection_Column', '')
 
