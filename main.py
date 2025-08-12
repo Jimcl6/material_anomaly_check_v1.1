@@ -7,13 +7,13 @@ import re
 
 pd.set_option('display.max_columns', None)  # Show all columns in DataFrame output
 
-NETWORK_DIR = r"D:\ai_team\AI Program\Outputs\PICompiled"
-FILENAME = f"PICompiled2025-04-29.csv"
+NETWORK_DIR = r"\\192.168.2.19\ai_team\AI Program\Outputs\PICompiled"
+FILENAME = f"PICompiled2025-07-11.csv"
 FILEPATH = os.path.join(NETWORK_DIR, FILENAME)
 DB_CONFIG = {
-    'host': 'localhost',
-    'user': 'root',
-    'password': '',
+    'host': '192.168.2.148',
+    'user': 'hpi.python',
+    'password': 'hpi.python',
     'database': 'fc_1_data_db'
 }
 
@@ -172,7 +172,7 @@ def get_process_data_for_materials(process_sn_list, target_materials, csv_date=N
             # Based on the table structure, materials are stored as individual columns
             material_columns = []
             for material in target_materials:
-                if material in ['Em2p', 'Em3p', 'Frame']:  # These materials exist in process1_data
+                if material in ['Frame']:  # These materials exist in process1_data
                     material_columns.append(f"Process_{process_num}_{material}")
                     material_columns.append(f"Process_{process_num}_{material}_Lot_No")
                 elif material == 'Casing_Block':
