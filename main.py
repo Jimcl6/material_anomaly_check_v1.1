@@ -20,27 +20,27 @@ DB_CONFIG = {
 # Define material patterns for inspection table mapping
 # Fixed mapping for Frame material inspection data
 FRAME_COLUMN_MAPPING = {
-    'Inspection_1_Minimum': 'Process_1_Frame_Inspection_1_Minimum',
-    'Inspection_1_Average': 'Process_1_Frame_Inspection_1_Average',
-    'Inspection_1_Maximum': 'Process_1_Frame_Inspection_1_Maximum',
-    'Inspection_2_Minimum': 'Process_1_Frame_Inspection_2_Minimum',
-    'Inspection_2_Average': 'Process_1_Frame_Inspection_2_Average',
-    'Inspection_2_Maximum': 'Process_1_Frame_Inspection_2_Maximum',
-    'Inspection_3_Minimum': 'Process_1_Frame_Inspection_3_Minimum',
-    'Inspection_3_Average': 'Process_1_Frame_Inspection_3_Average',
-    'Inspection_3_Maximum': 'Process_1_Frame_Inspection_3_Maximum',
-    'Inspection_4_Minimum': 'Process_1_Frame_Inspection_4_Minimum',
-    'Inspection_4_Average': 'Process_1_Frame_Inspection_4_Average',
-    'Inspection_4_Maximum': 'Process_1_Frame_Inspection_4_Maximum',
-    'Inspection_5_Minimum': 'Process_1_Frame_Inspection_5_Minimum',
-    'Inspection_5_Average': 'Process_1_Frame_Inspection_5_Average',
-    'Inspection_5_Maximum': 'Process_1_Frame_Inspection_5_Maximum',
-    'Inspection_6_Minimum': 'Process_1_Frame_Inspection_6_Minimum',
-    'Inspection_6_Average': 'Process_1_Frame_Inspection_6_Average',
-    'Inspection_6_Maximum': 'Process_1_Frame_Inspection_6_Maximum',
-    'Inspection_7_Minimum': 'Process_1_Frame_Inspection_7_Minimum',
-    'Inspection_7_Average': 'Process_1_Frame_Inspection_7_Average',
-    'Inspection_7_Maximum': 'Process_1_Frame_Inspection_7_Maximum'
+    'Process_1_Frame_Inspection_1_Minimum': 'Inspection_1_Minimum',
+    'Process_1_Frame_Inspection_1_Average': 'Inspection_1_Average',
+    'Process_1_Frame_Inspection_1_Maximum': 'Inspection_1_Maximum',
+    'Process_1_Frame_Inspection_2_Minimum': 'Inspection_2_Minimum',
+    'Process_1_Frame_Inspection_2_Average': 'Inspection_2_Average',
+    'Process_1_Frame_Inspection_2_Maximum': 'Inspection_2_Maximum',
+    'Process_1_Frame_Inspection_3_Minimum': 'Inspection_3_Minimum',
+    'Process_1_Frame_Inspection_3_Average': 'Inspection_3_Average',
+    'Process_1_Frame_Inspection_3_Maximum': 'Inspection_3_Maximum',
+    'Process_1_Frame_Inspection_4_Minimum': 'Inspection_4_Minimum',
+    'Process_1_Frame_Inspection_4_Average': 'Inspection_4_Average',
+    'Process_1_Frame_Inspection_4_Maximum': 'Inspection_4_Maximum',
+    'Process_1_Frame_Inspection_5_Minimum': 'Inspection_5_Minimum',
+    'Process_1_Frame_Inspection_5_Average': 'Inspection_5_Average',
+    'Process_1_Frame_Inspection_5_Maximum': 'Inspection_5_Maximum',
+    'Process_1_Frame_Inspection_6_Minimum': 'Inspection_6_Minimum',
+    'Process_1_Frame_Inspection_6_Average': 'Inspection_6_Average',
+    'Process_1_Frame_Inspection_6_Maximum': 'Inspection_6_Maximum',
+    'Process_1_Frame_Inspection_7_Minimum': 'Inspection_7_Minimum',
+    'Process_1_Frame_Inspection_7_Average': 'Inspection_7_Average',
+    'Process_1_Frame_Inspection_7_Maximum': 'Inspection_7_Maximum'
 }
 
 material_patterns = {
@@ -142,7 +142,7 @@ def get_process_data_for_materials(process_sn_list, target_materials, csv_date=N
         return None
     
     results = {}
-    target_materials = ['Em2p', 'Em3p', 'Frame', 'Casing_Block', 'Rod_Blk', 'Df_Blk']
+    target_materials = ['Frame']
     
     try:
         cursor = connection.cursor(dictionary=True)
@@ -1112,7 +1112,7 @@ def perform_deviation_calculations(database_df, inspection_df):
     print(inspection_df.head())
     
     # Define the 6 major materials
-    major_materials = ['Em2p', 'Em3p', 'Frame', 'Casing_Block', 'Rod_Blk', 'Df_Blk']
+    major_materials = ['Frame']
     
     # Use hardcoded list of known working inspections (only inspections that exist in both database AND inspection data)
     print("Using hardcoded list of available inspection types...")
@@ -1285,13 +1285,13 @@ def perform_deviation_calculations(database_df, inspection_df):
     
     # Add explicit mapping between inspection numbers and their types
     inspection_type_mapping = {
-        '1': 'Dimension',  # Frame inspection types
-        '2': 'Dimension',
+        '1': '',  # Frame inspection types
+        '2': '',
         '3': 'Resistance',
         '4': 'Dimension',
         '5': 'Dimension',
-        '6': 'Dimension',
-        '7': 'Dimension',
+        '6': '',
+        '7': '',
         '10': 'Pull_Test'
     }
     
@@ -1632,7 +1632,7 @@ def process_material_data():
     print(f"Process S/N values from CSV: {process_sn_list}")
     
     # Step 2: Define target materials
-    target_materials = ['Em2p', 'Em3p', 'Frame', 'Casing_Block', 'Rod_Blk', 'Df_Blk']
+    target_materials = ['Frame']
     print(f"Target materials: {target_materials}")
     
     # Step 3: Query process tables
@@ -1972,7 +1972,7 @@ def create_material_sheet_data(deviation_df, material_code, inspection_df):
                     break
             
             # For Frame material, ensure we process all inspection numbers
-            if material_code.startswith('FM'):
+            if material_code.startswith('FM') and (material_code == 'FM05000102' or material_code.endswith('-01A')):
                 print(f"[DEBUG] Processing Frame inspection data")
                 # Check both database and inspection columns
                 for insp_num in range(1, 8):  # Process inspections 1-7
@@ -1980,7 +1980,9 @@ def create_material_sheet_data(deviation_df, material_code, inspection_df):
                     # Look for inspection columns in both formats
                     db_patterns = [
                         f'Process_1_Frame_Inspection_{insp_str}',
-                        f'Inspection_{insp_str}',
+                        f'Inspection_{insp_str}_Maximum',
+                        f'Inspection_{insp_str}_Minimum',
+                        f'Inspection_{insp_str}_Average',
                         f'Frame_Inspection_{insp_str}'
                     ]
                     for pattern in db_patterns:
