@@ -7,40 +7,40 @@ import re
 
 pd.set_option('display.max_columns', None)  # Show all columns in DataFrame output
 
-NETWORK_DIR = r"\\192.168.2.19\ai_team\AI Program\Outputs\PICompiled"
-FILENAME = f"PICompiled2025-07-10.csv"
+NETWORK_DIR = r"D:\ai_team\AI Program\Outputs\PICompiled"
+FILENAME = f"PICompiled2025-04-29.csv"
 FILEPATH = os.path.join(NETWORK_DIR, FILENAME)
 DB_CONFIG = {
-    'host': '192.168.2.148',
-    'user': 'hpi.python',
-    'password': 'hpi.python',
+    'host': 'localhost',
+    'user': 'root',
+    'password': '',
     'database': 'fc_1_data_db'
 }
 
 # Define material patterns for inspection table mapping
 # Fixed mapping for Frame material inspection data
 FRAME_COLUMN_MAPPING = {
-    'Process_1_Frame_Inspection_1_Minimum': 'Inspection_1_Minimum',
-    'Process_1_Frame_Inspection_1_Average': 'Inspection_1_Average',
-    'Process_1_Frame_Inspection_1_Maximum': 'Inspection_1_Maximum',
-    'Process_1_Frame_Inspection_2_Minimum': 'Inspection_2_Minimum',
-    'Process_1_Frame_Inspection_2_Average': 'Inspection_2_Average',
-    'Process_1_Frame_Inspection_2_Maximum': 'Inspection_2_Maximum',
-    'Process_1_Frame_Inspection_3_Minimum': 'Inspection_3_Minimum',
-    'Process_1_Frame_Inspection_3_Average': 'Inspection_3_Average',
-    'Process_1_Frame_Inspection_3_Maximum': 'Inspection_3_Maximum',
-    'Process_1_Frame_Inspection_4_Minimum': 'Inspection_4_Minimum',
-    'Process_1_Frame_Inspection_4_Average': 'Inspection_4_Average',
-    'Process_1_Frame_Inspection_4_Maximum': 'Inspection_4_Maximum',
-    'Process_1_Frame_Inspection_5_Minimum': 'Inspection_5_Minimum',
-    'Process_1_Frame_Inspection_5_Average': 'Inspection_5_Average',
-    'Process_1_Frame_Inspection_5_Maximum': 'Inspection_5_Maximum',
-    'Process_1_Frame_Inspection_6_Minimum': 'Inspection_6_Minimum',
-    'Process_1_Frame_Inspection_6_Average': 'Inspection_6_Average',
-    'Process_1_Frame_Inspection_6_Maximum': 'Inspection_6_Maximum',
-    'Process_1_Frame_Inspection_7_Minimum': 'Inspection_7_Minimum',
-    'Process_1_Frame_Inspection_7_Average': 'Inspection_7_Average',
-    'Process_1_Frame_Inspection_7_Maximum': 'Inspection_7_Maximum'
+    'Inspection_1_Minimum': 'Process_1_Frame_Inspection_1_Minimum',
+    'Inspection_1_Average': 'Process_1_Frame_Inspection_1_Average',
+    'Inspection_1_Maximum': 'Process_1_Frame_Inspection_1_Maximum',
+    'Inspection_2_Minimum': 'Process_1_Frame_Inspection_2_Minimum',
+    'Inspection_2_Average': 'Process_1_Frame_Inspection_2_Average',
+    'Inspection_2_Maximum': 'Process_1_Frame_Inspection_2_Maximum',
+    'Inspection_3_Minimum': 'Process_1_Frame_Inspection_3_Minimum',
+    'Inspection_3_Average': 'Process_1_Frame_Inspection_3_Average',
+    'Inspection_3_Maximum': 'Process_1_Frame_Inspection_3_Maximum',
+    'Inspection_4_Minimum': 'Process_1_Frame_Inspection_4_Minimum',
+    'Inspection_4_Average': 'Process_1_Frame_Inspection_4_Average',
+    'Inspection_4_Maximum': 'Process_1_Frame_Inspection_4_Maximum',
+    'Inspection_5_Minimum': 'Process_1_Frame_Inspection_5_Minimum',
+    'Inspection_5_Average': 'Process_1_Frame_Inspection_5_Average',
+    'Inspection_5_Maximum': 'Process_1_Frame_Inspection_5_Maximum',
+    'Inspection_6_Minimum': 'Process_1_Frame_Inspection_6_Minimum',
+    'Inspection_6_Average': 'Process_1_Frame_Inspection_6_Average',
+    'Inspection_6_Maximum': 'Process_1_Frame_Inspection_6_Maximum',
+    'Inspection_7_Minimum': 'Process_1_Frame_Inspection_7_Minimum',
+    'Inspection_7_Average': 'Process_1_Frame_Inspection_7_Average',
+    'Inspection_7_Maximum': 'Process_1_Frame_Inspection_7_Maximum'
 }
 
 material_patterns = {
