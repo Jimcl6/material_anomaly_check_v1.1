@@ -1063,7 +1063,7 @@ def perform_deviation_calculations(database_df, inspection_df):
     print(f"[INFO] Covering {len(major_materials)} materials × {len(available_inspections)} inspections × 6 processes × 3 data types")
     
     # Take only first 100 rows as specified
-    limited_database_df = database_df.head(200) if len(database_df) > 200 else database_df
+    limited_database_df = database_df.head(300) if len(database_df) > 300 else database_df
     
     # Calculate average of 100 units of data from database_data table for each column
     database_averages = {}
@@ -1565,7 +1565,7 @@ def process_material_data():
                 # If we have a model code, query database_data table
                 database_df = None
                 if model_code:
-                    database_df = get_database_data_for_model(model_code, 100)
+                    database_df = get_database_data_for_model(model_code, 300)
                 
                 # Perform deviation calculations if we have both database and inspection data
                 deviation_df = None
