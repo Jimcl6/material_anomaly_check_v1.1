@@ -158,9 +158,9 @@ def get_process_data_for_materials(process_sn_list, target_materials, csv_date=N
         
         # First, check the structure of process1_data to understand column names
         print("Checking table structure...")
-        columns = check_table_structure("process3_data")
+        columns = check_table_structure("process1_data")
         if columns:
-            print("Available columns in process3_data:")
+            print("Available columns in process1_data:")
             for col in columns:
                 print(f"  - {col['Field']} ({col['Type']})")
         
@@ -181,10 +181,19 @@ def get_process_data_for_materials(process_sn_list, target_materials, csv_date=N
             # Based on the table structure, materials are stored as individual columns
             material_columns = []
             for material in target_materials:
-                if material == 'Casing_Block':  # These materials exist in process1_data
+                if material in ['Em2p', 'Em3p']:  # These materials exist in process1_data
                     material_columns.append(f"Process_{process_num}_{material}")
                     material_columns.append(f"Process_{process_num}_{material}_Lot_No")
-                
+                elif material == 'Casing_Block':
+                    # Check if there's a Casing_Block column or similar
+                    material_columns.append(f"Process_{process_num}_Casing_Block")
+                    material_columns.append(f"Process_{process_num}_Casing_Block_Lot_No")
+                elif material == 'Rod_Blk':
+                    material_columns.append(f"Process_{process_num}_Rod_Blk")
+                    material_columns.append(f"Process_{process_num}_Rod_Blk_Lot_No")
+                elif material == 'Df_Blk':
+                    material_columns.append(f"Process_{process_num}_Df_Blk")
+                    material_columns.append(f"Process_{process_num}_Df_Blk_Lot_No")
             
             # Add basic columns
             select_columns = [sn_column, f"Process_{process_num}_Model_Code", f"Process_{process_num}_DateTime", f"Process_{process_num}_DATE"]
@@ -567,16 +576,17 @@ def get_material_inspection_data(material_results):
         if connection:
             connection.close()
         return None
-def get_database_data_for_model(model_code, limit=300):
+
+def get_database_data_for_model(model_code, limit=100):
     """
-    Query database_data table for at least 200 units of data based on Model Code
+    Query database_data table for all columns based on Model Code
     
     Args:
         model_code: The model code to filter by
-        limit: Number of records to retrieve (default 200)
+        limit: Number of records to retrieve after cleaning (default 300)
     
     Returns:
-        DataFrame with database data
+        DataFrame with all database data columns
     """
     connection = create_db_connection()
     if not connection:
@@ -585,44 +595,52 @@ def get_database_data_for_model(model_code, limit=300):
     try:
         cursor = connection.cursor(dictionary=True)
         
-        # First, check the structure of database_data table
         print(f"\n=== QUERYING DATABASE_DATA TABLE FOR MODEL {model_code} ===")
-        columns = check_table_structure("database_data")
-        if not columns:
-            print("Failed to get table structure for database_data")
-            return None
         
-        # Select ALL columns from database_data table
-        print(f"Found {len(columns)} total columns in database_data table")
-        print(f"All columns: {[col['Field'] for col in columns[:10]]}...")  # Show first 10 columns
+        # Adaptive approach: Start with a higher multiplier and adjust if needed
+        # Try to get at least the target number of records after cleaning
+        query_limit = max(int(limit * 2), 500)  # Use at least 500 or 2x limit, whichever is higher
         
-        # Use * to select all columns
-        columns_str = '*'
-        
-        # Query for data with the specific model code
-        query = f"""
-        SELECT {columns_str}
+        # Query for all columns with the specific model code
+        query = """
+        SELECT *
         FROM database_data
         WHERE Model_Code = %s
-        LIMIT {limit}
+        LIMIT %s
         """
         
-        print(f"Executing query: {query}")
-        cursor.execute(query, (model_code,))
+        print(f"Executing query to retrieve all columns for model {model_code} (query limit: {query_limit}, target after cleaning: {limit})")
+        cursor.execute(query, (model_code, query_limit))
         results = cursor.fetchall()
         
         if results:
-            print(f"Retrieved {len(results)} records from database_data for model {model_code}")
+            print(f"Retrieved {len(results)} raw records from database_data for model {model_code}")
             df = pd.DataFrame(results)
             print(f"Database DataFrame shape before cleaning: {df.shape}")
-            print(f"Database DataFrame columns before cleaning: {list(df.columns)}")  # Show first 10 columns
+            print(f"Total columns retrieved: {len(df.columns)}")
+            
             cursor.close()
             connection.close()
-# Clean the database data before returning
+            
+            # Clean the database data before returning
             print("Cleaning database data...")
             df_cleaned = clean_database_data(df)
             print(f"Database DataFrame shape after cleaning: {df_cleaned.shape}")
-            print(f"Database DataFrame columns after cleaning: {list(df_cleaned.columns)}")  # Show first 10 columns
+            print(f"Columns after cleaning: {len(df_cleaned.columns)}")
+            
+            # If we still don't have enough records after cleaning, provide detailed feedback
+            if len(df_cleaned) < limit:
+                print(f"WARNING: After cleaning, only {len(df_cleaned)} records remain (target was {limit})")
+                print(f"Raw records retrieved: {len(results)}")
+                print(f"Records lost during cleaning: {len(results) - len(df_cleaned)} ({((len(results) - len(df_cleaned))/len(results)*100):.1f}%)")
+                print(f"To get {limit} clean records, you may need to query {int(limit * len(results) / len(df_cleaned))} raw records")
+                print(f"Consider:")
+                print(f"  1. Increasing the limit parameter to {int(limit * len(results) / len(df_cleaned))}")
+                print(f"  2. Reviewing the cleaning criteria in clean_database_data()")
+                print(f"  3. Using the current {len(df_cleaned)} records if acceptable")
+            else:
+                print(f"SUCCESS: Retrieved {len(df_cleaned)} clean records (target was {limit})")
+            
             return df_cleaned
         else:
             print(f"No records found in database_data for model {model_code}")
@@ -635,6 +653,7 @@ def get_database_data_for_model(model_code, limit=300):
         if connection:
             connection.close()
         return None
+
 def clean_database_data(df):
     """
     Clean up database_data table rows and columns that contain specific keywords.
@@ -747,225 +766,13 @@ def filter_inspection_columns(df):
         print("Sample of columns that didn't match:")
         for i, col in enumerate(df.columns[:10]):
             print(f"  {i+1}. {col}")
-        return pd.DataFrame()
-
-def normalize_inspection_columns(inspection_df):
-    """
-    Enhanced normalize inspection DataFrame column names with much more flexible pattern matching.
-    
-    This version:
-    1. Handles real-world column naming conventions
-    2. Uses multiple strategies to identify inspection types
-    3. Is more tolerant of different naming patterns
-    4. Provides comprehensive debug logging
-    
-    Args:
-        inspection_df: DataFrame with inspection data
-        
-    Returns:
-        DataFrame with normalized column names
-    """
-    if inspection_df is None or inspection_df.empty:
-        return inspection_df
-    
-    print("\n=== ENHANCED NORMALIZE INSPECTION COLUMN NAMES ===")
-    print(f"[INFO] Original columns ({len(inspection_df.columns)}): {list(inspection_df.columns)}")
-    
-    # Show sample data to understand what we're working with
-    print(f"\n[DEBUG] Sample inspection data:")
-    if not inspection_df.empty:
-        for col in inspection_df.columns:
-            try:
-                sample_value = inspection_df[col].iloc[0]
-                print(f"  {col}: {sample_value} (type: {type(sample_value).__name__})")
-            except:
-                print(f"  {col}: <error reading value>")
-    
-    # Create a mapping of old column names to new standardized names
-    column_mapping = {}
-    
-    # Enhanced inspection type mapping with more flexible detection
-    inspection_strategies = {
-        '1': {'type': '',
-        'keywords': [],
-        'patterns': r'.*_1_.*'},
-        '2': {'type': '',
-        'keywords': [],
-        'patterns': r'.*_2_.*'},
-        '3': {
-            'type': 'Resistance',
-            'keywords': ['resistance', 'resist', 'ohm', 'impedance', 'electrical', 'conductivity', 'continuity'],
-            'patterns': [r'.*_3_.*', r'.*resistance.*', r'.*ohm.*', r'.*electrical.*', r'.*continuity.*']
-        },
-        '4': {
-            'type': 'Dimension',
-            'keywords': ['dimension', 'dim', 'size', 'measurement', 'length', 'width', 'height', 'thickness', 'diameter', 'distance'],
-            'patterns': [r'.*_4_.*', r'.*dimension.*', r'.*size.*', r'.*length.*', r'.*width.*', r'.*height.*', r'.*thickness.*', r'.*diameter.*']
-        },
-        '5': {
-            'type': 'Dimension',
-            'keywords': ['dimension', 'dim', 'size', 'measurement', 'length', 'width', 'height', 'thickness', 'diameter', 'distance', 'clearance'],
-            'patterns': [r'.*_5_.*', r'.*dimension.*', r'.*size.*', r'.*clearance.*', r'.*gap.*', r'.*spacing.*']
-        },
-        '6': {'type': '',
-        'keywords': [],
-        'patterns': r'.*_6_.*'},
-        '7': {'type': '',
-        'keywords': [],
-        'patterns': r'.*_7_.*'},
-        '10': {
-            'type': 'Pull_Test',
-            'keywords': ['pull', 'test', 'pulltest', 'tensile', 'force', 'strength', 'load', 'breaking'],
-            'patterns': [r'.*_10_.*', r'.*pull.*', r'.*test.*', r'.*tensile.*', r'.*force.*', r'.*strength.*', r'.*load.*']
-        }
-    }
-    
-    print(f"\n[DEBUG] Enhanced inspection strategies:")
-    for num, strategy in inspection_strategies.items():
-        print(f"  Inspection {num} ({strategy['type']}): {len(strategy['keywords'])} keywords, {len(strategy['patterns'])} patterns")
-    
-    print(f"\n[DEBUG] Processing {len(inspection_df.columns)} columns for normalization...")
-    
-    # Process each column
-    for col in inspection_df.columns:
-        if col in ['Lot_Number', 'Material_Code', 'Date', 'DateTime', 'ID', 'id']:
-            print(f"  [SKIP] Identifier column: {col}")
-            continue  # Keep identifier columns as-is
-        
-        print(f"\n  [PROCESS] Analyzing column: {col}")
-        
-        # Strategy 1: Direct pattern matching for inspection numbers
-        inspection_num = None
-        matched_strategy = None
-        
-        for num, strategy in inspection_strategies.items():
-            # Check patterns first
-            for pattern in strategy['patterns']:
-                if re.search(pattern, col.lower()):
-                    inspection_num = num
-                    matched_strategy = f"Pattern match: {pattern}"
-                    print(f"    [PATTERN] Found inspection {num} using pattern: {pattern}")
-                    break
-            
-            if inspection_num:
-                break
-        
-        # Strategy 2: Keyword-based detection if pattern matching fails
-        if not inspection_num:
-            for num, strategy in inspection_strategies.items():
-                for keyword in strategy['keywords']:
-                    if keyword in col.lower():
-                        inspection_num = num
-                        matched_strategy = f"Keyword match: {keyword}"
-                        print(f"    [KEYWORD] Found inspection {num} using keyword: {keyword}")
-                        break
-                
-                if inspection_num:
-                    break
-        
-        # Strategy 3: Numeric column heuristics
-        if not inspection_num:
-            # Check if it's a numeric column that might be inspection data
-            try:
-                # Try to convert sample values to see if it's numeric
-                sample_val = inspection_df[col].iloc[0] if len(inspection_df) > 0 else None
-                if sample_val is not None:
-                    numeric_val = pd.to_numeric(sample_val, errors='coerce')
-                    if not pd.isna(numeric_val):
-                        # This is a numeric column, try to infer inspection type
-                        if any(keyword in col.lower() for keyword in ['avg', 'average', 'min', 'minimum', 'max', 'maximum', 'value', 'data', 'result']):
-                            # Default to inspection 4 (Dimension) for unidentified numeric columns
-                            inspection_num = '4'
-                            matched_strategy = "Numeric column heuristic"
-                            print(f"    [HEURISTIC] Defaulting to inspection 4 (Dimension) for numeric column: {col}")
-            except:
-                pass
-        
-        # Strategy 4: Fallback - any remaining numeric columns
-        if not inspection_num:
-            # Check if column contains any inspection-related terms
-            inspection_terms = ['inspection', 'test', 'measurement', 'value', 'result', 'data']
-            if any(term in col.lower() for term in inspection_terms):
-                inspection_num = '4'  # Default fallback
-                matched_strategy = "Fallback to inspection 4"
-                print(f"    [FALLBACK] Defaulting to inspection 4 for inspection-related column: {col}")
-        
-        # Process the column if we found an inspection number
-        if inspection_num and inspection_num in inspection_strategies:
-            strategy = inspection_strategies[inspection_num]
-            inspection_type = strategy['type']
-            
-            # Determine the data type (Average, Minimum, Maximum)
-            data_type = 'Average'  # Default
-            if any(keyword in col.lower() for keyword in ['min', 'minimum']):
-                data_type = 'Minimum'
-            elif any(keyword in col.lower() for keyword in ['max', 'maximum']):
-                data_type = 'Maximum'
-            elif any(keyword in col.lower() for keyword in ['avg', 'average', 'mean']):
-                data_type = 'Average'
-            
-            print(f"    [TYPE] Determined data type: {data_type}")
-            print(f"    [TYPE] Mapped inspection type: {inspection_type}")
-            print(f"    [STRATEGY] Used strategy: {matched_strategy}")
-            
-            # Create standardized column name
-            if inspection_type == 'Pull_Test':
-                new_col_name = f'Inspection_{inspection_num}_Pull_Test'
-            else:
-                new_col_name = f'Inspection_{inspection_num}_{inspection_type}_{data_type}'
-            
-            column_mapping[col] = new_col_name
-            print(f"    [MAP] {col} -> {new_col_name}")
-        else:
-            print(f"    [SKIP] No inspection mapping found for: {col}")
-    
-    print(f"\n[SUMMARY] Created {len(column_mapping)} column mappings")
-    
-    # Show detailed mapping summary
-    if column_mapping:
-        print(f"\n[MAPPINGS] Column mappings created:")
-        for old_col, new_col in column_mapping.items():
-            print(f"  {old_col} -> {new_col}")
-        
-        # Apply the column mapping
-        normalized_df = inspection_df.rename(columns=column_mapping)
-        print(f"\n[SUCCESS] Normalized columns ({len(normalized_df.columns)}): {list(normalized_df.columns)}")
-        
-        # Show breakdown by inspection type
-        inspection_counts = {}
-        for new_col in column_mapping.values():
-            if 'Inspection_' in new_col:
-                parts = new_col.split('_')
-                if len(parts) >= 2:
-                    insp_num = parts[1]
-                    if insp_num not in inspection_counts:
-                        inspection_counts[insp_num] = 0
-                    inspection_counts[insp_num] += 1
-        
-        print(f"\n[BREAKDOWN] Columns by inspection type:")
-        for insp_num, count in sorted(inspection_counts.items()):
-            insp_type = inspection_strategies.get(insp_num, {}).get('type', 'Unknown')
-            print(f"  Inspection {insp_num} ({insp_type}): {count} columns")
-        
-        return normalized_df
-    else:
-        print(f"\n[WARNING] No columns were normalized - using original DataFrame")
-        print(f"[INFO] This might indicate that the inspection table column names don't match any expected patterns")
-        print(f"[INFO] Consider examining the actual column names in the material inspection tables")
-        
-        # Show what we tried to match
-        print(f"\n[DEBUG] Patterns and keywords we tried to match:")
-        for num, strategy in inspection_strategies.items():
-            print(f"  Inspection {num} ({strategy['type']}):")
-            print(f"    Keywords: {strategy['keywords'][:5]}...")  # Show first 5 keywords
-            print(f"    Patterns: {strategy['patterns'][:3]}...")   # Show first 3 patterns
-        
-        return inspection_df
+        return pd.DataFrame(columns=df.columns)  # Return an empty DataFrame with the same columns
 
 def convert_to_numeric_safe(value, column_name=None):
     """
     Safely convert a value to numeric type with comprehensive error handling and logging.
     
+{{ ... }}
     Args:
         value: The value to convert
         column_name: Optional column name for better error messages
@@ -1039,7 +846,7 @@ def perform_deviation_calculations(database_df, inspection_df, process_sn_list=N
 
     print("\n=== PERFORMING DEVIATION CALCULATIONS ===")
     print(f"Database DataFrame shape: {database_df.shape}")
-    print(f"Database DataFrame columns (first 10): {list(database_df.columns)}")
+    print(f"Database DataFrame columns (first 10): {list(database_df.columns)[:10]}")
     print(f"Inspection DataFrame shape: {inspection_df.shape}")
     print(f"Inspection DataFrame columns: {list(inspection_df.columns)}")
     print(f"Inspection DataFrame sample data:")
@@ -1072,7 +879,7 @@ def perform_deviation_calculations(database_df, inspection_df, process_sn_list=N
     print(f"[INFO] Covering {len(major_materials)} materials × {len(available_inspections)} inspections × 6 processes × 3 data types")
     
     # Take only first 100 rows as specified
-    limited_database_df = database_df.tail(100) if len(database_df) > 100 else database_df
+    limited_database_df = database_df.head(100) if len(database_df) > 100 else database_df
     
     # Calculate average of 100 units of data from database_data table for each column
     database_averages = {}
@@ -1362,7 +1169,7 @@ def perform_deviation_calculations(database_df, inspection_df, process_sn_list=N
                 if matched_inspection_value is not None:
                     # Apply deviation formula: (Average of 100 historical database_data rows - Current material inspection data) / Average of 100 historical database_data rows
                     deviation = (db_avg - matched_inspection_value) / db_avg
-                    deviation = round(deviation, 4)  # Round to 6 decimal places
+                    deviation = round(deviation, 4)
                     
                     # Add row to results with detailed information
                     results_data.append({
@@ -1379,7 +1186,8 @@ def perform_deviation_calculations(database_df, inspection_df, process_sn_list=N
                         'Material_Code': material_code,
                         'Inspection_Number': inspection_num,
                         'Data_Type': data_type,
-                        'Inspection_Table': material_patterns[material]['inspection_table'] if material in material_patterns else ''
+                        'Inspection_Table': material_patterns[material]['inspection_table'] if material in material_patterns else '',
+                        'Absolute_Deviation': abs(deviation)  # New field
                     })
     
     # Create DataFrame with results in the format matching deviation_calculations.xlsx
@@ -1577,7 +1385,7 @@ def process_material_data():
                 # If we have a model code, query database_data table
                 database_df = None
                 if model_code:
-                    database_df = get_database_data_for_model(model_code, 300)
+                    database_df = get_database_data_for_model(model_code, 100)
                 
                 # Perform deviation calculations if we have both database and inspection data
                 deviation_df = None
@@ -1654,7 +1462,14 @@ def filter_deviation_data_by_material(deviation_df, material_code):
     
     # Enhanced material pattern mapping based on the sample data
     material_patterns = {
+        'EM0580106P': ['Em2p'],
+        'EM0580107P': ['Em3p'],
+        'FM05000102': ['Frame'],
+        'FM05000102-01A': ['Frame'],  # Handle Frame with suffix
         'CSB6400802': ['Casing_Block'],
+        'EM0660046P': ['Em2p', 'Em3p'],  # Could match multiple patterns
+        'RDB5200200': ['Rod_Blk'],
+        'DFB6600600': ['Df_Blk']
     }
     
     # Get patterns for this material code
@@ -1759,7 +1574,7 @@ def create_material_sheet_data(deviation_df, material_code, inspection_df):
         inspection_value = ''
         if material_inspection_data is not None:
             # For Frame material, use the exact mapping from fm05000102_inspection table
-            if material_code.startswith('FM') and (material_code == 'FM05000102-01A' or material_code.endswith('-01A')):
+            if material_code.startswith('FM') and (material_code == 'FM05000102' or material_code.endswith('-01A')):
                 # Get the original inspection column name
                 db_col = row.get('Column', '')
                 match = re.search(r'(Inspection_\d+_(?:Maximum|Minimum|Average))', db_col)
@@ -1827,7 +1642,7 @@ def create_material_sheet_data(deviation_df, material_code, inspection_df):
     
     return pd.DataFrame(material_sheet_data)
 
-def create_excel_output(process_df, inspection_df, database_df, deviation_df, filename="csb_data_output.xlsx"):
+def create_excel_output(process_df, inspection_df, database_df, deviation_df, filename="em_data_output.xlsx"):
     """
     Create an Excel file with material-based sheets, inspection data, and database data.
     
@@ -1880,15 +1695,6 @@ def create_excel_output(process_df, inspection_df, database_df, deviation_df, fi
             # Create material-based sheets
             print(f"\n[INFO] Creating material-based sheets for {len(material_codes)} materials...")
             
-            # Create CSB_Deviations sheet with complete deviation_data dataframe
-            if deviation_df is not None and not deviation_df.empty:
-                deviation_df.to_excel(writer, sheet_name='CSB_Deviations', index=False)
-                sheets_created += 1
-                print(f"  [OK] Created 'CSB_Deviations' sheet with {len(deviation_df)} rows")
-                print(f"  [INFO] Deviation data columns: {list(deviation_df.columns)}")
-            else:
-                print(f"  [WARN] No deviation data available to write to Excel")
-            
             for material_code in material_codes:
                 print(f"\n[PROCESS] Creating sheet for material: {material_code}")
                 
@@ -1922,11 +1728,17 @@ def create_excel_output(process_df, inspection_df, database_df, deviation_df, fi
                 sheets_created += 1
                 print(f"  [OK] Created 'Database_Data' sheet with {len(database_df)} rows")
             
+            # Create Deviation_Data sheet with raw deviation calculations
+            if deviation_df is not None and not deviation_df.empty:
+                deviation_df.to_excel(writer, sheet_name='Deviation_Data', index=False)
+                sheets_created += 1
+                print(f"  [OK] Created 'Deviation_Data' sheet with {len(deviation_df)} rows")
+            
             print(f"\n=== EXCEL FILE CREATED ===")
             print(f"Excel file '{filename}' created successfully!")
             print(f"Total sheets created: {sheets_created}")
             print(f"Material sheets: {len(material_codes)}")
-            print(f"Data sheets: 3 (CSB_Deviations, Inspection_Data, Database_Data)")
+            print(f"Data sheets: 3 (Inspection_Data, Database_Data, Deviation_Data)")
     
     except Exception as e:
         print(f"[ERROR] Error creating Excel file: {e}")
@@ -1989,14 +1801,14 @@ if __name__ == "__main__":
             inspection_df=result.get('inspection_dataframe'),
             database_df=result.get('database_data'),
             deviation_df=result.get('deviation_data'),
-            filename="csb_data_output.xlsx"
+            filename="em_data_output.xlsx"
         )
         
         # Additional confirmation
         
-        if os.path.exists("csb_data_output.xlsx"):
-            file_size = os.path.getsize("csb_data_output.xlsx")
-            print(f"[OK] Excel file created successfully: csb_data_output.xlsx ({file_size} bytes)")
+        if os.path.exists("em_data_output.xlsx"):
+            file_size = os.path.getsize("em_data_output.xlsx")
+            print(f"[OK] Excel file created successfully: em_data_output.xlsx ({file_size} bytes)")
         else:
             print("[X] Excel file was not created")
 
