@@ -4,10 +4,14 @@ import pandas as pd
 from sqlalchemy import create_engine
 import mysql.connector
 import re
+import datetime
+
+x = datetime.datetime.now()
 
 pd.set_option('display.max_columns', None)  # Show all columns in DataFrame output
 
 NETWORK_DIR = r"\\192.168.2.19\ai_team\AI Program\Outputs\PICompiled"
+# FILENAME = f"PICompiled{x.year}-{x.strftime("%m")}-{x.strftime('%d')}.csv"
 FILENAME = f"PICompiled2025-07-11.csv"
 FILEPATH = os.path.join(NETWORK_DIR, FILENAME)
 DB_CONFIG = {
@@ -73,14 +77,34 @@ material_patterns = {
 def read_csv_with_pandas(file_path):
 
     try:
-        piCompiled = pd.read_csv(file_path).tail(1)
+        piCompiled = pd.read_csv(file_path)
         piCompiled["MODEL CODE"]= piCompiled["MODEL CODE"].astype(str).str.replace('"', '', regex=False)
-        print("CSV successfully loaded into a DataFrame!")
-        # print(piCompiled.head())  # Show first few rows
-        return piCompiled[['DATE', 'MODEL CODE', 'PROCESS S/N']]
+        
+        # Filter out rows containing specific keywords
+        keywords_to_remove = ['NG', 'TRIAL', 'MASTER PUMP', 'RUNNING', 'RE PI']
+        print(f"Original CSV rows: {len(piCompiled)}")
+        
+        # Create a mask to filter out rows containing any of the keywords in any column
+        mask = pd.Series([True] * len(piCompiled))
+        for keyword in keywords_to_remove:
+            for col in piCompiled.columns:
+                if piCompiled[col].dtype == 'object':  # Only check string columns
+                    mask = mask & (~piCompiled[col].astype(str).str.contains(keyword, case=False, na=False))
+        
+        piCompiled_filtered = piCompiled[mask]
+        print(f"Filtered CSV rows: {len(piCompiled_filtered)} (removed {len(piCompiled) - len(piCompiled_filtered)} rows)")
+        print(f"Keywords filtered: {keywords_to_remove}")
+        
+        # Take the last row after filtering
+        piCompiled_final = piCompiled_filtered.tail(1)
+        print("CSV successfully loaded and filtered!")
+        
+        # Include S/N column in the return
+        return piCompiled_final[['DATE', 'MODEL CODE', 'PROCESS S/N', 'S/N']]
     except Exception as e:
         print(f"Error loading CSV: {e}")
         return None
+
 def create_db_connection():
     """Create database connection using the DB_CONFIG"""
     try:
@@ -568,25 +592,12 @@ def get_database_data_for_model(model_code, limit=300):
             print("Failed to get table structure for database_data")
             return None
         
-        # Find columns that match our naming pattern
-        target_columns = []
-        for col in columns:
-            col_name = col['Field']
-            # Check if column name matches our pattern
-            if any(pattern in col_name for pattern in ['Process_', 'Inspection_', 'Maximum', 'Minimum', 'Average', 'Pull_Test']):
-                target_columns.append(col_name)
+        # Select ALL columns from database_data table
+        print(f"Found {len(columns)} total columns in database_data table")
+        print(f"All columns: {[col['Field'] for col in columns[:10]]}...")  # Show first 10 columns
         
-        # Always include the Model_Code and PASS_NG columns
-        if 'Model_Code' not in target_columns:
-            target_columns.append('Model_Code')
-        if 'PASS_NG' not in target_columns:
-            target_columns.append('PASS_NG')
-        
-        print(f"Found {len(target_columns)} potential target columns")
-        print(f"Target columns: {target_columns[:10]}...")  # Show first 10 columns
-        
-        # Create column string for query
-        columns_str = ', '.join(target_columns) if target_columns else '*'
+        # Use * to select all columns
+        columns_str = '*'
         
         # Query for data with the specific model code
         query = f"""
@@ -644,9 +655,7 @@ def clean_database_data(df):
         "RE PI",
         "MASTER PUMP",
         "NG AT",
-        "REPAIRED",
-        "INSPECTION ONLY",
-        "CHANGE PUMP"
+        "INSPECTION ONLY"
     ]
     
     print(f"Cleaning database data with {len(df)} rows and {len(df.columns)} columns")
@@ -1004,7 +1013,7 @@ def convert_to_numeric_safe(value, column_name=None):
         print(f"  [ERROR] Conversion failed: {str(e)}")
         return None, False
 
-def perform_deviation_calculations(database_df, inspection_df):
+def perform_deviation_calculations(database_df, inspection_df, process_sn_list=None, sn_list=None):
     """
     Calculate deviation between database historical data and current inspection data for materials.
     
@@ -1063,7 +1072,7 @@ def perform_deviation_calculations(database_df, inspection_df):
     print(f"[INFO] Covering {len(major_materials)} materials × {len(available_inspections)} inspections × 6 processes × 3 data types")
     
     # Take only first 100 rows as specified
-    limited_database_df = database_df.head(200) if len(database_df) > 200 else database_df
+    limited_database_df = database_df.tail(100) if len(database_df) > 100 else database_df
     
     # Calculate average of 100 units of data from database_data table for each column
     database_averages = {}
@@ -1366,6 +1375,7 @@ def perform_deviation_calculations(database_df, inspection_df):
                         'Deviation': deviation,
                         'Process_Number': process_num,
                         'Material': material,
+                        'S/N': sn_list[0] if sn_list else 'N/A',
                         'Material_Code': material_code,
                         'Inspection_Number': inspection_num,
                         'Data_Type': data_type,
@@ -1449,9 +1459,11 @@ def process_material_data():
         print("Failed to read CSV data or no data found")
         return None
     
-    # Extract Process S/N values
+    # Extract Process S/N values and actual S/N values
     process_sn_list = csv_data['PROCESS S/N'].tolist()
+    sn_list = csv_data['S/N'].tolist()
     print(f"Process S/N values from CSV: {process_sn_list}")
+    print(f"S/N values from CSV: {sn_list}")
     
     # Step 2: Define target materials
     target_materials = ['Casing_Block']
@@ -1565,7 +1577,7 @@ def process_material_data():
                 # If we have a model code, query database_data table
                 database_df = None
                 if model_code:
-                    database_df = get_database_data_for_model(model_code, 100)
+                    database_df = get_database_data_for_model(model_code, 300)
                 
                 # Perform deviation calculations if we have both database and inspection data
                 deviation_df = None
@@ -1582,7 +1594,7 @@ def process_material_data():
                     print(f"Filtered inspection shape: {inspection_df_for_calc.shape}")
                     print(f"Filtered inspection columns: {list(inspection_df_for_calc.columns)}")
                     
-                    deviation_df = perform_deviation_calculations(filtered_database_df, inspection_df_for_calc)
+                    deviation_df = perform_deviation_calculations(filtered_database_df, inspection_df_for_calc, process_sn_list, sn_list)
                 
                 return {
                     'process_data': consolidated_df,
@@ -1747,39 +1759,39 @@ def create_material_sheet_data(deviation_df, material_code, inspection_df):
         inspection_value = ''
         if material_inspection_data is not None:
             # For Frame material, use the exact mapping from fm05000102_inspection table
-            # if material_code.startswith('FM') and (material_code == 'FM05000102-01A' or material_code.endswith('-01A')):
-            #     # Get the original inspection column name
-            #     db_col = row.get('Column', '')
-            #     match = re.search(r'(Inspection_\d+_(?:Maximum|Minimum|Average))', db_col)
-            #     if match:
-            #         inspection_col = match.group(1)
-            #         # Get the mapped column name from our global mapping
-            #         mapped_col = FRAME_COLUMN_MAPPING.get(inspection_col)
-            #         if mapped_col and mapped_col in material_inspection_data:
-            #             try:
-            #                 value = material_inspection_data[mapped_col]
+            if material_code.startswith('FM') and (material_code == 'FM05000102-01A' or material_code.endswith('-01A')):
+                # Get the original inspection column name
+                db_col = row.get('Column', '')
+                match = re.search(r'(Inspection_\d+_(?:Maximum|Minimum|Average))', db_col)
+                if match:
+                    inspection_col = match.group(1)
+                    # Get the mapped column name from our global mapping
+                    mapped_col = FRAME_COLUMN_MAPPING.get(inspection_col)
+                    if mapped_col and mapped_col in material_inspection_data:
+                        try:
+                            value = material_inspection_data[mapped_col]
 
 
-            #                 if pd.notna(value):
-            #                     numeric_value = pd.to_numeric(value)
-            #                     inspection_value = float(numeric_value)
-            #                 else:
-            #                     print(f"  [WARN] NaN value found for mapped column {mapped_col}")
-            #             except (ValueError, TypeError) as e:
-            #                 print(f"  [WARN] Could not convert value '{value}' to numeric for mapped column {mapped_col}: {e}")
-            # else:
+                            if pd.notna(value):
+                                numeric_value = pd.to_numeric(value)
+                                inspection_value = float(numeric_value)
+                            else:
+                                print(f"  [WARN] NaN value found for mapped column {mapped_col}")
+                        except (ValueError, TypeError) as e:
+                            print(f"  [WARN] Could not convert value '{value}' to numeric for mapped column {mapped_col}: {e}")
+            else:
                 # For other materials, use the matched column directly
-            matched_col = row.get('Matched_Inspection_Column')
-            if matched_col and matched_col in material_inspection_data:
-                try:
-                    value = material_inspection_data[matched_col]
-                    if pd.notna(value):
-                        numeric_value = pd.to_numeric(value)
-                        inspection_value = float(numeric_value)
-                    else:
-                        print(f"  [WARN] NaN value found for column {matched_col}")
-                except (ValueError, TypeError) as e:
-                    print(f"  [WARN] Could not convert value '{value}' to numeric for column {matched_col}: {e}")
+                matched_col = row.get('Matched_Inspection_Column')
+                if matched_col and matched_col in material_inspection_data:
+                    try:
+                        value = material_inspection_data[matched_col]
+                        if pd.notna(value):
+                            numeric_value = pd.to_numeric(value)
+                            inspection_value = float(numeric_value)
+                        else:
+                            print(f"  [WARN] NaN value found for column {matched_col}")
+                    except (ValueError, TypeError) as e:
+                        print(f"  [WARN] Could not convert value '{value}' to numeric for column {matched_col}: {e}")
         
         # Convert database average to numeric
         db_avg = row.get('Database_Average', '')
@@ -1868,6 +1880,15 @@ def create_excel_output(process_df, inspection_df, database_df, deviation_df, fi
             # Create material-based sheets
             print(f"\n[INFO] Creating material-based sheets for {len(material_codes)} materials...")
             
+            # Create CSB_Deviations sheet with complete deviation_data dataframe
+            if deviation_df is not None and not deviation_df.empty:
+                deviation_df.to_excel(writer, sheet_name='CSB_Deviations', index=False)
+                sheets_created += 1
+                print(f"  [OK] Created 'CSB_Deviations' sheet with {len(deviation_df)} rows")
+                print(f"  [INFO] Deviation data columns: {list(deviation_df.columns)}")
+            else:
+                print(f"  [WARN] No deviation data available to write to Excel")
+            
             for material_code in material_codes:
                 print(f"\n[PROCESS] Creating sheet for material: {material_code}")
                 
@@ -1905,7 +1926,7 @@ def create_excel_output(process_df, inspection_df, database_df, deviation_df, fi
             print(f"Excel file '{filename}' created successfully!")
             print(f"Total sheets created: {sheets_created}")
             print(f"Material sheets: {len(material_codes)}")
-            print(f"Data sheets: 2 (Inspection_Data, Database_Data)")
+            print(f"Data sheets: 3 (CSB_Deviations, Inspection_Data, Database_Data)")
     
     except Exception as e:
         print(f"[ERROR] Error creating Excel file: {e}")

@@ -11,7 +11,7 @@ x = datetime.datetime.now()
 pd.set_option('display.max_columns', None)  # Show all columns in DataFrame output
 
 NETWORK_DIR = r"\\192.168.2.19\ai_team\AI Program\Outputs\PICompiled"
-# FILENAME = f"PICompiled{x.year}-{x.strftime('%m')}-{x.strftime('%d')}.csv"
+# FILENAME = f"PICompiled{x.year}-{x.strftime("%m")}-{x.strftime('%d')}.csv"
 FILENAME = f"PICompiled2025-07-11.csv"
 FILEPATH = os.path.join(NETWORK_DIR, FILENAME)
 DB_CONFIG = {
@@ -78,10 +78,11 @@ def read_csv_with_pandas(file_path):
         print("CSV successfully loaded and filtered!")
         
         # Include S/N column in the return
-        return piCompiled_final[['DATE', 'MODEL CODE', 'PROCESS S/N']]
+        return piCompiled_final[['DATE', 'MODEL CODE', 'PROCESS S/N', 'S/N']]
     except Exception as e:
         print(f"Error loading CSV: {e}")
         return None
+
 def create_db_connection():
     """Create database connection using the DB_CONFIG"""
     try:
@@ -311,24 +312,22 @@ def get_inspection_data_by_lot_number(checksheet_df, csv_date=None):
             print("No date matches found, trying lot number pattern matching as fallback...")
             all_rows = []
             for lot_number in material_lot_numbers:
-                # Extract base pattern (e.g., "02122517A-305U" -> "02122517A-")
-                if '-' in lot_number:
-                    base_pattern = lot_number.split('-')[0] + '-'
-                    pattern_query = """
-                    SELECT * FROM rd05200200_inspection
-                    WHERE Lot_Number LIKE %s
-                    ORDER BY Date DESC
-                    """
-                    cursor.execute(pattern_query, (base_pattern + '%',))
-                    pattern_rows = cursor.fetchall()
-                    if pattern_rows:
-                        print(f"Found {len(pattern_rows)} pattern matches for {base_pattern}")
-                        # Show available dates for debugging
-                        dates = [row.get('Date', 'No Date') for row in pattern_rows]
-                        print(f"Available inspection dates: {dates}")
-                        # Use only the most recent record as fallback
-                        all_rows = [pattern_rows[0]]
-                        break
+                base_pattern = lot_number.split('-')[0] + '-'
+                pattern_query = """
+                SELECT * FROM rd05200200_inspection
+                WHERE Lot_Number LIKE %s
+                ORDER BY Date DESC
+                """
+                cursor.execute(pattern_query, (base_pattern + '%',))
+                pattern_rows = cursor.fetchall()
+                if pattern_rows:
+                    print(f"Found {len(pattern_rows)} pattern matches for {lot_number}")
+                    # Show available dates for debugging
+                    dates = [row.get('Date', 'No Date') for row in pattern_rows]
+                    print(f"Available inspection dates: {dates}")
+                    # Use only the most recent record as fallback
+                    all_rows = [pattern_rows[0]]
+                    break
             rows = all_rows
         
         cursor.close()
@@ -453,7 +452,7 @@ def combine_checksheet_and_inspection_data(checksheet_df, inspection_df):
         return combined_df
 
 
-def get_database_data_for_model(model_code, limit=300):
+def get_database_data_for_model(model_code, limit=100):
     """
     Query database_data table for 100 units of data based on Model Code.
     Only include records where PASS_NG = "1" (passing records) for accurate historical averages.
@@ -482,9 +481,7 @@ def get_database_data_for_model(model_code, limit=300):
             'RE PI',
             'MASTER PUMP',
             'NG AT',
-            'REPAIRED',
             'INSPECTION ONLY',
-            'CHANGE PUMP'
         ]
         
         # Build keyword filtering conditions for NG_Cause columns
@@ -556,7 +553,7 @@ def get_database_data_for_model(model_code, limit=300):
         return None
 
 
-def calculate_rod_blk_deviations(database_df, combined_df):
+def calculate_rod_blk_deviations(database_df, combined_df, process_sn_list=None, sn_list=None):
     """
     Calculate deviations for Rod_Blk material using the formula:
     (Average of 100 historical database_data rows - Data from DataFrame) / Average of 100 historical database_data rows
@@ -564,6 +561,7 @@ def calculate_rod_blk_deviations(database_df, combined_df):
     Args:
         database_df: DataFrame with database data (100 historical records)
         combined_df: Combined DataFrame with checksheet and inspection data
+        process_sn_list: List of process S/N values from CSV
         
     Returns:
         DataFrame with deviation calculations
@@ -722,11 +720,20 @@ def calculate_rod_blk_deviations(database_df, combined_df):
                     deviation = (db_avg - combined_value) / db_avg
                     
                     deviation_results.append({
-                        'Database_Column': db_col,
-                        'Combined_Column': matched_col,
+                        'Column': db_col,
                         'Database_Average': db_avg,
-                        'Combined_Value': combined_value,
-                        'Deviation': deviation
+                        'Inspection_Value': combined_value,
+                        'Matched_Inspection_Column': matched_col,
+                        'Matching_Strategy': 'Rod_Blk Pattern Matching',
+                        'Lot_Number': 'N/A',
+                        'Deviation': deviation,
+                        'Process_Number': '2',
+                        'Material': 'Rod_Blk',
+                        'S/N': sn_list[0] if sn_list else 'N/A',
+                        'Material_Code': 'RDB5200200',
+                        'Inspection_Number': 'N/A',
+                        'Data_Type': 'N/A',
+                        'Inspection_Table': 'rd05200200_inspection'
                     })
                     
                     print(f"  ✓ Deviation calculated: {db_col} -> {matched_col} = {deviation:.6f}")
@@ -803,10 +810,12 @@ def process_rod_blk_material_data():
     
     # Extract required values
     process_sn_list = csv_data['PROCESS S/N'].tolist()
+    sn_list = csv_data['S/N'].tolist()
     model_code = csv_data['MODEL CODE'].iloc[0]
     csv_date = csv_data['DATE'].iloc[0]
     
     print(f"Process S/N list: {process_sn_list}")
+    print(f"S/N list: {sn_list}")
     print(f"Model Code: {model_code}")
     print(f"CSV Date: {csv_date}")
     
@@ -836,11 +845,11 @@ def process_rod_blk_material_data():
     
     # Step 6: Get database data for model
     print("\n6. Getting database data...")
-    database_df = get_database_data_for_model(model_code, 300)
+    database_df = get_database_data_for_model(model_code, 100)
     
     # Step 7: Calculate deviations
     print("\n7. Calculating deviations...")
-    deviation_df = calculate_rod_blk_deviations(database_df, combined_df)
+    deviation_df = calculate_rod_blk_deviations(database_df, combined_df, process_sn_list, sn_list)
     
     # Step 8: Create Excel output
     print("\n8. Creating Excel output...")

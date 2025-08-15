@@ -4,11 +4,15 @@ import pandas as pd
 from sqlalchemy import create_engine
 import mysql.connector
 import re
+import datetime
+
+x = datetime.datetime.now()
 
 pd.set_option('display.max_columns', None)  # Show all columns in DataFrame output
 
 NETWORK_DIR = r"\\192.168.2.19\ai_team\AI Program\Outputs\PICompiled"
-FILENAME = f"PICompiled2025-07-10.csv"
+# FILENAME = f"PICompiled{x.year}-{x.strftime("%m")}-{x.strftime('%d')}.csv"
+FILENAME = f"PICompiled2025-07-11.csv"
 FILEPATH = os.path.join(NETWORK_DIR, FILENAME)
 DB_CONFIG = {
     'host': '192.168.2.148',
@@ -73,14 +77,34 @@ material_patterns = {
 def read_csv_with_pandas(file_path):
 
     try:
-        piCompiled = pd.read_csv(file_path).tail(1)
+        piCompiled = pd.read_csv(file_path)
         piCompiled["MODEL CODE"]= piCompiled["MODEL CODE"].astype(str).str.replace('"', '', regex=False)
-        print("CSV successfully loaded into a DataFrame!")
-        # print(piCompiled.head())  # Show first few rows
-        return piCompiled[['DATE', 'MODEL CODE', 'PROCESS S/N']]
+        
+        # Filter out rows containing specific keywords
+        keywords_to_remove = ['NG', 'TRIAL', 'MASTER PUMP', 'RUNNING', 'RE PI']
+        print(f"Original CSV rows: {len(piCompiled)}")
+        
+        # Create a mask to filter out rows containing any of the keywords in any column
+        mask = pd.Series([True] * len(piCompiled))
+        for keyword in keywords_to_remove:
+            for col in piCompiled.columns:
+                if piCompiled[col].dtype == 'object':  # Only check string columns
+                    mask = mask & (~piCompiled[col].astype(str).str.contains(keyword, case=False, na=False))
+        
+        piCompiled_filtered = piCompiled[mask]
+        print(f"Filtered CSV rows: {len(piCompiled_filtered)} (removed {len(piCompiled) - len(piCompiled_filtered)} rows)")
+        print(f"Keywords filtered: {keywords_to_remove}")
+        
+        # Take the last row after filtering
+        piCompiled_final = piCompiled_filtered.tail(1)
+        print("CSV successfully loaded and filtered!")
+        
+        # Include S/N column in the return
+        return piCompiled_final[['DATE', 'MODEL CODE', 'PROCESS S/N', 'S/N']]
     except Exception as e:
         print(f"Error loading CSV: {e}")
         return None
+
 def create_db_connection():
     """Create database connection using the DB_CONFIG"""
     try:
@@ -553,7 +577,7 @@ def get_material_inspection_data(material_results):
             connection.close()
         return None
 
-def get_database_data_for_model(model_code, limit=300):
+def get_database_data_for_model(model_code, limit=100):
     """
     Query database_data table for all columns based on Model Code
     
@@ -650,9 +674,7 @@ def clean_database_data(df):
         "RE PI",
         "MASTER PUMP",
         "NG AT",
-        "REPAIRED",
-        "INSPECTION ONLY",
-        "CHANGE PUMP"
+        "INSPECTION ONLY"
     ]
     
     print(f"Cleaning database data with {len(df)} rows and {len(df.columns)} columns")
@@ -798,7 +820,7 @@ def convert_to_numeric_safe(value, column_name=None):
         print(f"  [ERROR] Conversion failed: {str(e)}")
         return None, False
 
-def perform_deviation_calculations(database_df, inspection_df):
+def perform_deviation_calculations(database_df, inspection_df, process_sn_list=None, sn_list=None):
     """
     Calculate deviation between database historical data and current inspection data for materials.
     
@@ -857,7 +879,7 @@ def perform_deviation_calculations(database_df, inspection_df):
     print(f"[INFO] Covering {len(major_materials)} materials × {len(available_inspections)} inspections × 6 processes × 3 data types")
     
     # Take only first 100 rows as specified
-    limited_database_df = database_df.head(300) if len(database_df) > 300 else database_df
+    limited_database_df = database_df.head(100) if len(database_df) > 100 else database_df
     
     # Calculate average of 100 units of data from database_data table for each column
     database_averages = {}
@@ -1159,10 +1181,12 @@ def perform_deviation_calculations(database_df, inspection_df):
                         'Deviation': deviation,
                         'Process_Number': process_num,
                         'Material': material,
+                        'S/N': sn_list[0] if sn_list else 'N/A',
                         'Material_Code': material_code,
                         'Inspection_Number': inspection_num,
                         'Data_Type': data_type,
-                        'Inspection_Table': material_patterns[material]['inspection_table'] if material in material_patterns else ''
+                        'Inspection_Table': material_patterns[material]['inspection_table'] if material in material_patterns else '',
+                        'Absolute_Deviation': abs(deviation)  # New field
                     })
     
     # Create DataFrame with results in the format matching deviation_calculations.xlsx
@@ -1242,9 +1266,11 @@ def process_material_data():
         print("Failed to read CSV data or no data found")
         return None
     
-    # Extract Process S/N values
+    # Extract Process S/N values and actual S/N values
     process_sn_list = csv_data['PROCESS S/N'].tolist()
+    sn_list = csv_data['S/N'].tolist()
     print(f"Process S/N values from CSV: {process_sn_list}")
+    print(f"S/N values from CSV: {sn_list}")
     
     # Step 2: Define target materials
     target_materials = ['Em2p', 'Em3p', 'Frame', 'Casing_Block', 'Rod_Blk', 'Df_Blk']
@@ -1375,7 +1401,7 @@ def process_material_data():
                     print(f"Filtered inspection shape: {inspection_df_for_calc.shape}")
                     print(f"Filtered inspection columns: {list(inspection_df_for_calc.columns)}")
                     
-                    deviation_df = perform_deviation_calculations(filtered_database_df, inspection_df_for_calc)
+                    deviation_df = perform_deviation_calculations(filtered_database_df, inspection_df_for_calc, process_sn_list, sn_list)
                 
                 return {
                     'process_data': consolidated_df,
@@ -1615,7 +1641,7 @@ def create_material_sheet_data(deviation_df, material_code, inspection_df):
     
     return pd.DataFrame(material_sheet_data)
 
-def create_excel_output(process_df, inspection_df, database_df, deviation_df, filename="material_data_output.xlsx"):
+def create_excel_output(process_df, inspection_df, database_df, deviation_df, filename="em_data_output.xlsx"):
     """
     Create an Excel file with material-based sheets, inspection data, and database data.
     
@@ -1701,11 +1727,17 @@ def create_excel_output(process_df, inspection_df, database_df, deviation_df, fi
                 sheets_created += 1
                 print(f"  [OK] Created 'Database_Data' sheet with {len(database_df)} rows")
             
+            # Create Deviation_Data sheet with raw deviation calculations
+            if deviation_df is not None and not deviation_df.empty:
+                deviation_df.to_excel(writer, sheet_name='Deviation_Data', index=False)
+                sheets_created += 1
+                print(f"  [OK] Created 'Deviation_Data' sheet with {len(deviation_df)} rows")
+            
             print(f"\n=== EXCEL FILE CREATED ===")
             print(f"Excel file '{filename}' created successfully!")
             print(f"Total sheets created: {sheets_created}")
             print(f"Material sheets: {len(material_codes)}")
-            print(f"Data sheets: 2 (Inspection_Data, Database_Data)")
+            print(f"Data sheets: 3 (Inspection_Data, Database_Data, Deviation_Data)")
     
     except Exception as e:
         print(f"[ERROR] Error creating Excel file: {e}")
@@ -1768,14 +1800,14 @@ if __name__ == "__main__":
             inspection_df=result.get('inspection_dataframe'),
             database_df=result.get('database_data'),
             deviation_df=result.get('deviation_data'),
-            filename="material_data_output.xlsx"
+            filename="em_data_output.xlsx"
         )
         
         # Additional confirmation
         
-        if os.path.exists("material_data_output.xlsx"):
-            file_size = os.path.getsize("material_data_output.xlsx")
-            print(f"[OK] Excel file created successfully: material_data_output.xlsx ({file_size} bytes)")
+        if os.path.exists("em_data_output.xlsx"):
+            file_size = os.path.getsize("em_data_output.xlsx")
+            print(f"[OK] Excel file created successfully: em_data_output.xlsx ({file_size} bytes)")
         else:
             print("[X] Excel file was not created")
 
