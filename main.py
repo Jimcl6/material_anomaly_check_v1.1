@@ -1,991 +1,723 @@
 #%%
-import os
+import tkinter as tk
+from tkinter import ttk, messagebox, filedialog
 import pandas as pd
-from sqlalchemy import create_engine
-import mysql.connector
-import re
+import os
 import datetime
+import threading
+import sys
+import subprocess
+import time
+import hashlib
+from pathlib import Path
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
 
-x = datetime.datetime.now()
+# Import the material processing modules
+try:
+    import frame
+    import csb_data_output
+    import rod_blk_output
+    import em_material
+except ImportError as e:
+    print(f"Error importing material modules: {e}")
 
-pd.set_option('display.max_columns', None)  # Show all columns in DataFrame output
-
-NETWORK_DIR = r"\\192.168.2.19\ai_team\AI Program\Outputs\PICompiled"
-# FILENAME = f"PICompiled{x.year}-{x.strftime('%m')}-{x.strftime('%d')}.csv"
-FILENAME = f"PICompiled2025-07-11.csv"
-FILEPATH = os.path.join(NETWORK_DIR, FILENAME)
-DB_CONFIG = {
-    'host': '192.168.2.148',
-    'user': 'hpi.python',
-    'password': 'hpi.python',
-    'database': 'fc_1_data_db'
-}
-
-# Define material patterns for inspection table mapping
-# Fixed mapping for Frame material inspection data
-
-
-material_patterns = {
-    'Em2p': {
-        'prefix': 'Em2p',
-        'inspection_table': 'em0580106p_inspection'
-    },
-    'Em3p': {
-        'prefix': 'Em3p',
-        'inspection_table': 'em0580107p_inspection'
-    },
-    'Frame': {
-        'prefix': 'Frame',
-        'inspection_table': 'fm05000102_inspection'
-    },
-    'Casing_Block': {
-        'prefix': 'Casing_Block',
-        'inspection_table': 'csb6400802_inspection'
-    },
-    'Rod_Blk': {
-        'prefix': 'Rod_Blk',
-        'inspection_table': ['rdb5200200_checksheet', 'rdb5200200_inspection']
-    },
-    'Df_Blk': {
-        'prefix': 'Df_Blk',
-        'inspection_table': 'dfb6600600_inspection'
-    }
-}
-
-def read_csv_with_pandas(file_path):
-
-    try:
-        piCompiled = pd.read_csv(file_path)
-        piCompiled["MODEL CODE"]= piCompiled["MODEL CODE"].astype(str).str.replace('"', '', regex=False)
-        
-        # Filter out rows containing specific keywords
-        keywords_to_remove = ['NG', 'TRIAL', 'MASTER PUMP', 'RUNNING', 'RE PI']
-        print(f"Original CSV rows: {len(piCompiled)}")
-        
-        # Create a mask to filter out rows containing any of the keywords in any column
-        mask = pd.Series([True] * len(piCompiled))
-        for keyword in keywords_to_remove:
-            for col in piCompiled.columns:
-                if piCompiled[col].dtype == 'object':  # Only check string columns
-                    mask = mask & (~piCompiled[col].astype(str).str.contains(keyword, case=False, na=False))
-        
-        piCompiled_filtered = piCompiled[mask]
-        print(f"Filtered CSV rows: {len(piCompiled_filtered)} (removed {len(piCompiled) - len(piCompiled_filtered)} rows)")
-        print(f"Keywords filtered: {keywords_to_remove}")
-        
-        # Take the last row after filtering
-        piCompiled_final = piCompiled_filtered.tail(1)
-        print("CSV successfully loaded and filtered!")
-        
-        # Include S/N column in the return
-        return piCompiled_final[['DATE', 'MODEL CODE', 'PROCESS S/N']]
-    except Exception as e:
-        print(f"Error loading CSV: {e}")
-        return None
-def create_db_connection():
-    """Create database connection using the DB_CONFIG"""
-    try:
-        connection = mysql.connector.connect(**DB_CONFIG)
-        print("Database connection established successfully!")
-        return connection
-    except Exception as e:
-        print(f"Error connecting to database: {e}")
-        return None
-
-def check_table_structure(table_name):
-    """Check the structure of a table to see available columns"""
-    connection = create_db_connection()
-    if not connection:
-        return None
+class CSVFileHandler(FileSystemEventHandler):
+    """File system event handler for monitoring CSV file changes"""
     
-    try:
-        cursor = connection.cursor(dictionary=True)
-        cursor.execute(f"DESCRIBE {table_name}")
-        columns = cursor.fetchall()
-        cursor.close()
-        connection.close()
-        return columns
-    except Exception as e:
-        print(f"Error checking table structure for {table_name}: {e}")
-        if connection:
-            connection.close()
-        return None
-
-
-def get_rod_blk_lot_from_process_data(process_sn_list, csv_date):
-    """
-    Get Rod_Blk lot numbers from process2_data table using Process S/N and DATE.
-    Uses .tail() to get the latest row for matching Process_2_S_N and Process_2_DATE.
-    
-    Args:
-        process_sn_list: List of Process S/N values from CSV
-        csv_date: Date from CSV to filter process data
+    def __init__(self, gui_instance):
+        self.gui = gui_instance
+        self.last_processed_hash = None
         
-    Returns:
-        Dictionary with Process S/N as key and Rod_Blk lot number as value
-    """
-    connection = create_db_connection()
-    if not connection:
-        return None
-    
-    rod_blk_lot_mapping = {}
-    
-    try:
-        cursor = connection.cursor(dictionary=True)
-        
-        print("\n=== GETTING ROD_BLK LOT NUMBERS FROM PROCESS2_DATA ===")
-        print(f"Filtering by CSV date: {csv_date}")
-        print(f"Process S/N list: {process_sn_list}")
-        
-        # For each Process S/N, get the latest (tail) row matching both S/N and DATE
-        for process_sn in process_sn_list:
-            query = """
-            SELECT Process_2_S_N, Process_2_Rod_Blk_Lot_No, Process_2_DATE
-            FROM process2_data
-            WHERE Process_2_S_N = %s
-            AND Process_2_DATE = %s
-            AND Process_2_Rod_Blk_Lot_No IS NOT NULL
-            AND Process_2_Rod_Blk_Lot_No != ''
-            LIMIT 1
-            """
+    def on_modified(self, event):
+        if event.is_directory:
+            return
             
-            cursor.execute(query, (process_sn, csv_date))
-            row = cursor.fetchone()
-            
-            if row:
-                lot_no = row['Process_2_Rod_Blk_Lot_No']
-                rod_blk_lot_mapping[process_sn] = lot_no
-                print(f"  Process S/N: {process_sn} -> Rod_Blk Lot: {lot_no}")
-            else:
-                print(f"  No Rod_Blk lot found for Process S/N: {process_sn}")
-        
-        cursor.close()
-        connection.close()
-        
-        print(f"Found {len(rod_blk_lot_mapping)} Rod_Blk lot mappings")
-        return rod_blk_lot_mapping
-        
-    except Exception as e:
-        print(f"Error getting Rod_Blk lot numbers: {e}")
-        if connection:
-            connection.close()
-        return None
+        # Check if the modified file is our target CSV
+        if hasattr(self.gui, 'csv_file_path') and event.src_path == self.gui.csv_file_path:
+            self.gui.log_event(f"CSV file change detected: {event.src_path}")
+            # Add small delay to ensure file write is complete
+            threading.Timer(2.0, self.gui.process_csv_change).start()
 
-
-def get_checksheet_data_by_prod_date(rod_blk_lot_mapping):
-    """
-    Get data from rdb5200200_checksheet table using Rod_Blk lot numbers as Prod_Date.
-    
-    Args:
-        rod_blk_lot_mapping: Dictionary with Process S/N as key and Rod_Blk lot number as value
+class MaterialAnomalyGUI:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Material Anomaly Detection System")
+        self.root.geometry("1400x900")
+        self.root.configure(bg='#f0f0f0')
         
-    Returns:
-        DataFrame with checksheet data
-    """
-    connection = create_db_connection()
-    if not connection:
-        return None
-    
-    try:
-        cursor = connection.cursor(dictionary=True)
+        # Initialize data storage
+        self.all_deviation_data = {}  # Store deviation data for each material
+        self.current_table_data = pd.DataFrame()
+        self.selected_material = tk.StringVar(value="")
         
-        print("\n=== GETTING CHECKSHEET DATA FROM rdb5200200_checksheet ===")
+        # Create comprehensive deviation log
+        self.deviation_log_file = os.path.join(os.path.expanduser("~"), "Desktop", "comprehensive_deviation_log.xlsx")
         
-        # Get unique lot numbers to use as Prod_Date
-        lot_numbers = list(set(rod_blk_lot_mapping.values()))
+        # CSV monitoring setup
+        self.csv_file_path = r"\\192.168.2.19\ai_team\AI Program\Outputs\PICompiled\PICompiled2025-07-11.csv"
+        self.auto_monitoring = tk.BooleanVar(value=False)
+        self.file_observer = None
+        self.last_csv_hash = None
+        self.critical_deviations_log = os.path.join(os.path.expanduser("~"), "Desktop", "critical_deviations_auto_log.xlsx")
         
-        if not lot_numbers:
-            print("No lot numbers to search for")
-            return pd.DataFrame()
+        self.setup_gui()
+        self.setup_event_logger()
         
-        print(f"Searching for Prod_Date values: {lot_numbers}")
+    def setup_gui(self):
+        """Setup the main GUI layout"""
+        # Main container
+        main_frame = ttk.Frame(self.root, padding="10")
+        main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
-        # Create placeholders for the IN clause
-        placeholders = ','.join(['%s'] * len(lot_numbers))
+        # Configure grid weights
+        self.root.columnconfigure(0, weight=1)
+        self.root.rowconfigure(0, weight=1)
+        main_frame.columnconfigure(1, weight=1)
+        main_frame.rowconfigure(1, weight=1)
         
-        # Query rdb5200200_checksheet table
-        query = f"""
-        SELECT *
-        FROM rdb5200200_checksheet
-        WHERE Prod_Date IN ({placeholders})
-        """
+        # Title
+        title_label = ttk.Label(main_frame, text="Material Anomaly Detection System", 
+                               font=('Arial', 16, 'bold'))
+        title_label.grid(row=0, column=0, columnspan=2, pady=(0, 20))
         
-        cursor.execute(query, lot_numbers)
-        rows = cursor.fetchall()
+        # Left panel for controls
+        control_frame = ttk.LabelFrame(main_frame, text="Controls", padding="10")
+        control_frame.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=(0, 10))
         
-        if rows:
-            print(f"Found {len(rows)} matching records in rdb5200200_checksheet")
-            checksheet_df = pd.DataFrame(rows)
-            print("Checksheet data columns:", list(checksheet_df.columns))
-            print("Sample checksheet data:")
-            print(checksheet_df.head())
-            return checksheet_df
-        else:
-            print("No matching records found in rdb5200200_checksheet")
-            return pd.DataFrame()
+        # Material selection radio buttons
+        material_frame = ttk.LabelFrame(control_frame, text="Material Selection", padding="10")
+        material_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
         
-        cursor.close()
-        connection.close()
+        # Radio buttons for materials
+        materials = [("All Critical Deviations", ""), ("Frame", "Frame"), 
+                    ("CSB", "CSB"), ("Rod Block", "Rod_Blk"), ("EM Material", "Em")]
         
-    except Exception as e:
-        print(f"Error getting checksheet data: {e}")
-        if connection:
-            connection.close()
-        return pd.DataFrame()
-
-
-def get_inspection_data_by_lot_number(checksheet_df, csv_date=None):
-    """
-    Get data from rd05200200_inspection table using Material_Lot_Number from checksheet as Lot_Number.
-    Filter by CSV date to get only the inspection record matching the CSV date.
-    
-    Args:
-        checksheet_df: DataFrame with checksheet data containing Material_Lot_Number column
-        csv_date: CSV date string (e.g., "2025/07/11") to filter inspection records
+        for i, (text, value) in enumerate(materials):
+            rb = ttk.Radiobutton(material_frame, text=text, variable=self.selected_material, 
+                               value=value, command=self.update_table_display)
+            rb.grid(row=i, column=0, sticky=tk.W, pady=2)
         
-    Returns:
-        DataFrame with inspection data (filtered by date if provided)
-    """
-    connection = create_db_connection()
-    if not connection:
-        return pd.DataFrame()
-    
-    try:
-        cursor = connection.cursor(dictionary=True)
+        # Set default selection
+        self.selected_material.set("")
         
-        print("\n=== GETTING INSPECTION DATA FROM rd05200200_inspection ===")
+        # Action buttons
+        button_frame = ttk.LabelFrame(control_frame, text="Actions", padding="10")
+        button_frame.grid(row=1, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
         
-        if checksheet_df.empty or 'Material_Lot_Number' not in checksheet_df.columns:
-            print("No Material_Lot_Number found in checksheet data")
-            return pd.DataFrame()
+        ttk.Button(button_frame, text="Refresh Data", 
+                  command=self.refresh_data).grid(row=0, column=0, pady=5, sticky=(tk.W, tk.E))
         
-        # Get unique material lot numbers
-        material_lot_numbers = checksheet_df['Material_Lot_Number'].dropna().unique().tolist()
+        ttk.Button(button_frame, text="Save Selected Results", 
+                  command=self.save_selected_results).grid(row=1, column=0, pady=5, sticky=(tk.W, tk.E))
         
-        if not material_lot_numbers:
-            print("No material lot numbers to search for")
-            return pd.DataFrame()
+        ttk.Button(button_frame, text="Save All Results", 
+                  command=self.save_all_results).grid(row=2, column=0, pady=5, sticky=(tk.W, tk.E))
         
-        print(f"Searching for inspection data with lot numbers: {material_lot_numbers}")
+        # Auto-monitoring controls
+        monitoring_frame = ttk.LabelFrame(control_frame, text="Auto Monitoring", padding="10")
+        monitoring_frame.grid(row=3, column=0, sticky=(tk.W, tk.E), pady=(10, 0))
         
-        # Strategy 1: Try exact lot number match first
-        placeholders = ','.join(['%s'] * len(material_lot_numbers))
-        query = f"""
-        SELECT * FROM rd05200200_inspection
-        WHERE Lot_Number IN ({placeholders})
-        """
+        self.monitoring_checkbox = ttk.Checkbutton(monitoring_frame, text="Enable CSV Auto-Monitoring", 
+                                                  variable=self.auto_monitoring, 
+                                                  command=self.toggle_monitoring)
+        self.monitoring_checkbox.grid(row=0, column=0, sticky=tk.W, pady=2)
         
-        cursor.execute(query, material_lot_numbers)
-        rows = cursor.fetchall()
+        ttk.Button(monitoring_frame, text="Set CSV File Path", 
+                  command=self.set_csv_file_path).grid(row=1, column=0, pady=5, sticky=(tk.W, tk.E))
         
-        # Strategy 2: If no exact matches and CSV date provided, prioritize date matching
-        if not rows and csv_date:
-            print("No exact lot number matches found, trying date-first approach...")
-            
-            # Convert CSV date format "2025/07/11" to inspection date format "2025-07-11"
-            target_date = csv_date.replace('/', '-')
-            print(f"Looking for inspection data on date: {target_date}")
-            
-            # Query for any inspection records on the target date
-            date_query = """
-            SELECT * FROM rd05200200_inspection
-            WHERE Date = %s
-            ORDER BY Lot_Number
-            """
-            
-            cursor.execute(date_query, (target_date,))
-            date_rows = cursor.fetchall()
-            
-            if date_rows:
-                print(f"Found {len(date_rows)} inspection records on {target_date}")
-                lot_numbers = [row['Lot_Number'] for row in date_rows]
-                print(f"Available lot numbers on {target_date}: {lot_numbers}")
-                # Use the first record from the target date
-                rows = [date_rows[0]]
-                print(f"Selected inspection record: {date_rows[0]['Lot_Number']} on {target_date}")
-            else:
-                print(f"No inspection data found for date {target_date}")
+        self.csv_path_label = ttk.Label(monitoring_frame, text="No CSV file selected", 
+                                       foreground="gray", wraplength=200)
+        self.csv_path_label.grid(row=2, column=0, pady=2, sticky=(tk.W, tk.E))
         
-        # Strategy 3: If still no matches, try pattern matching (fallback)
-        if not rows:
-            print("No date matches found, trying lot number pattern matching as fallback...")
-            all_rows = []
-            for lot_number in material_lot_numbers:
-                # Extract base pattern (e.g., "02122517A-305U" -> "02122517A-")
-                if '-' in lot_number:
-                    base_pattern = lot_number.split('-')[0] + '-'
-                    pattern_query = """
-                    SELECT * FROM rd05200200_inspection
-                    WHERE Lot_Number LIKE %s
-                    ORDER BY Date DESC
-                    """
-                    cursor.execute(pattern_query, (base_pattern + '%',))
-                    pattern_rows = cursor.fetchall()
-                    if pattern_rows:
-                        print(f"Found {len(pattern_rows)} pattern matches for {base_pattern}")
-                        # Show available dates for debugging
-                        dates = [row.get('Date', 'No Date') for row in pattern_rows]
-                        print(f"Available inspection dates: {dates}")
-                        # Use only the most recent record as fallback
-                        all_rows = [pattern_rows[0]]
-                        break
-            rows = all_rows
+        # Progress bar
+        self.progress_var = tk.DoubleVar()
+        self.progress_bar = ttk.Progressbar(control_frame, variable=self.progress_var, 
+                                          maximum=100, length=200)
+        self.progress_bar.grid(row=4, column=0, sticky=(tk.W, tk.E), pady=10)
         
-        cursor.close()
-        connection.close()
+        # Status label
+        self.status_label = ttk.Label(control_frame, text="Ready", foreground="green")
+        self.status_label.grid(row=5, column=0, pady=5)
         
-        if rows:
-            df = pd.DataFrame(rows)
-            print(f"Retrieved {len(df)} inspection rows before date filtering")
-            
-            # Filter by CSV date if provided
-            if csv_date and 'Date' in df.columns:
-                # Convert CSV date format "2025/07/11" to match inspection date format "2025-07-11"
-                target_date = csv_date.replace('/', '-')
-                print(f"Filtering inspection data for date: {target_date}")
-                
-                # Convert Date column to string for comparison
-                df['Date'] = df['Date'].astype(str)
-                
-                # Filter to only include rows matching the target date
-                date_filtered_df = df[df['Date'].str.contains(target_date, na=False)]
-                
-                if not date_filtered_df.empty:
-                    print(f"Found {len(date_filtered_df)} inspection rows matching date {target_date}")
-                    print(f"Filtered inspection data: {date_filtered_df[['Date', 'Lot_Number']].to_dict()}")
-                    return date_filtered_df
-                else:
-                    print(f"No inspection rows found for date {target_date}")
-                    print(f"Available dates in inspection data: {df['Date'].unique().tolist()}")
-                    # Return the most recent inspection data as fallback
-                    print("Using most recent inspection data as fallback")
-                    return df.head(1)
-            else:
-                print("No CSV date provided or Date column not found, returning all inspection data")
-                
-            print(f"Inspection DataFrame columns: {list(df.columns)}")
-            print(f"Sample inspection data: {df.head(1).to_dict()}")
-            return df
-        else:
-            print("No inspection data found for the given lot numbers")
-            # Debug: Check what lot numbers exist in the table
-            connection = create_db_connection()
-            cursor = connection.cursor(dictionary=True)
-            cursor.execute("SELECT DISTINCT Lot_Number FROM rd05200200_inspection LIMIT 10")
-            sample_lots = cursor.fetchall()
-            print(f"Sample lot numbers in inspection table: {[row['Lot_Number'] for row in sample_lots]}")
-            cursor.close()
-            connection.close()
-            return pd.DataFrame()
-            
-    except Exception as e:
-        print(f"Error retrieving inspection data: {e}")
-        if connection:
-            connection.close()
-        return pd.DataFrame()
-
-
-def combine_checksheet_and_inspection_data(checksheet_df, inspection_df):
-    """
-    Combine checksheet and inspection data into one DataFrame.
-    
-    Args:
-        checksheet_df: DataFrame with checksheet data
-        inspection_df: DataFrame with inspection data
+        # Right panel for results
+        results_frame = ttk.LabelFrame(main_frame, text="Results", padding="10")
+        results_frame.grid(row=1, column=1, sticky=(tk.W, tk.E, tk.N, tk.S))
+        results_frame.columnconfigure(0, weight=1)
+        results_frame.rowconfigure(0, weight=1)
         
-    Returns:
-        Combined DataFrame
-    """
-    print("\n=== COMBINING CHECKSHEET AND INSPECTION DATA ===")
-    
-    if checksheet_df.empty and inspection_df.empty:
-        print("Both checksheet and inspection DataFrames are empty")
-        return pd.DataFrame()
-    
-    if checksheet_df.empty:
-        print("Checksheet DataFrame is empty, returning inspection data only")
-        print(f"Inspection DataFrame columns: {list(inspection_df.columns)}")
-        return inspection_df
-    
-    if inspection_df.empty:
-        print("Inspection DataFrame is empty, returning checksheet data only")
-        print(f"Checksheet DataFrame columns: {list(checksheet_df.columns)}")
-        return checksheet_df
-    
-    # Debug: Show column names from both tables
-    print(f"Checksheet DataFrame columns: {list(checksheet_df.columns)}")
-    print(f"Inspection DataFrame columns: {list(inspection_df.columns)}")
-    
-    # Debug: Check Tesla data in checksheet before merging
-    tesla_cols_checksheet = [col for col in checksheet_df.columns if 'Tesla' in col]
-    print(f"Tesla columns in checksheet: {tesla_cols_checksheet}")
-    if tesla_cols_checksheet:
-        print("Tesla data in checksheet (first row):")
-        for col in tesla_cols_checksheet:
-            print(f"  {col}: {checksheet_df[col].iloc[0]}")
-    
-    # Try to merge on Material_Lot_Number and Lot_Number
-    if 'Material_Lot_Number' in checksheet_df.columns and 'Lot_Number' in inspection_df.columns:
-        print("Merging on Material_Lot_Number (checksheet) and Lot_Number (inspection)")
-        combined_df = pd.merge(
-            checksheet_df, 
-            inspection_df, 
-            left_on='Material_Lot_Number', 
-            right_on='Lot_Number', 
-            how='outer',
-            suffixes=('_checksheet', '_inspection')
-        )
-        print(f"Combined DataFrame shape: {combined_df.shape}")
-        print("Combined DataFrame columns:", list(combined_df.columns))
-        print("Sample combined data:")
-        print(combined_df.head())
-        return combined_df
-    else:
-        print("Cannot merge - required columns not found. Concatenating instead.")
-        # Add source identifier
-        checksheet_df_copy = checksheet_df.copy()
-        inspection_df_copy = inspection_df.copy()
-        checksheet_df_copy['Data_Source'] = 'checksheet'
-        inspection_df_copy['Data_Source'] = 'inspection'
+        # Results table
+        self.setup_results_table(results_frame)
         
-        combined_df = pd.concat([checksheet_df_copy, inspection_df_copy], ignore_index=True, sort=False)
-        print(f"Concatenated DataFrame shape: {combined_df.shape}")
-        return combined_df
-
-
-def get_database_data_for_model(model_code, limit=300):
-    """
-    Query database_data table for 100 units of data based on Model Code.
-    Only include records where PASS_NG = "1" (passing records) for accurate historical averages.
-    Include dates for traceability.
-    
-    Args:
-        model_code: The model code to filter by
-        limit: Number of records to retrieve (default 100)
-    
-    Returns:
-        DataFrame with database data (only passing records)
-    """
-    connection = create_db_connection()
-    if not connection:
-        return None
-    
-    try:
-        cursor = connection.cursor(dictionary=True)
+        # Event logger at bottom
+        logger_frame = ttk.LabelFrame(main_frame, text="Event Log", padding="10")
+        logger_frame.grid(row=2, column=0, columnspan=2, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(10, 0))
+        logger_frame.columnconfigure(0, weight=1)
+        logger_frame.rowconfigure(0, weight=1)
         
-        print(f"\n=== QUERYING DATABASE_DATA TABLE FOR MODEL {model_code} ===")
+        self.setup_event_logger_widget(logger_frame)
         
-        # Define problematic keywords to filter out
-        problematic_keywords = [
-            'NG PRESSURE',
-            'REPAIRED AT', 
-            'RE PI',
-            'MASTER PUMP',
-            'NG AT',
-            'REPAIRED',
-            'INSPECTION ONLY',
-            'CHANGE PUMP'
-        ]
+    def setup_results_table(self, parent):
+        """Setup the results table with scrollbars"""
+        # Create treeview with scrollbars
+        tree_frame = ttk.Frame(parent)
+        tree_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        tree_frame.columnconfigure(0, weight=1)
+        tree_frame.rowconfigure(0, weight=1)
         
-        # Build keyword filtering conditions for NG_Cause columns
-        ng_cause_columns = [
-            'Process_1_NG_Cause',
-            'Process_2_NG_Cause', 
-            'Process_3_NG_Cause',
-            'Process_4_NG_Cause',
-            'Process_5_NG_Cause',
-            'Process_6_NG_Cause'
-        ]
+        # Define columns based on display mode
+        self.tree = ttk.Treeview(tree_frame, show='headings', height=15)
         
-        # Create WHERE conditions to exclude records with problematic keywords
-        keyword_conditions = []
-        for keyword in problematic_keywords:
-            for column in ng_cause_columns:
-                keyword_conditions.append(f"{column} NOT LIKE '%{keyword}%'")
+        # Configure table styling for better readability
+        style = ttk.Style()
+        style.configure("Treeview", 
+                       relief="solid",
+                       borderwidth=1)
+        style.configure("Treeview.Heading",
+                       relief="solid",
+                       borderwidth=1,
+                       font=('TkDefaultFont', 9, 'bold'))
         
-        keyword_filter = " AND ".join(keyword_conditions)
+        # Scrollbars
+        v_scrollbar = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=self.tree.yview)
+        h_scrollbar = ttk.Scrollbar(tree_frame, orient=tk.HORIZONTAL, command=self.tree.xview)
+        self.tree.configure(yscrollcommand=v_scrollbar.set, xscrollcommand=h_scrollbar.set)
         
-        # Query for data with the specific model code, filtering by PASS_NG = "1" and excluding problematic keywords
-        # Order by date descending to get the most recent clean passing records
-        query = f"""
-        SELECT *
-        FROM database_data
-        WHERE Model_Code = %s
-        AND PASS_NG = '1'
-        AND ({keyword_filter})
-        ORDER BY DATE DESC
-        LIMIT {limit}
-        """
+        # Grid layout
+        self.tree.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        v_scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
+        h_scrollbar.grid(row=1, column=0, sticky=(tk.W, tk.E))
         
-        print(f"Executing query for {limit} records (PASS_NG = '1', excluding problematic keywords)")
-        print(f"Filtering out keywords: {problematic_keywords}")
-        cursor.execute(query, (model_code,))
-        results = cursor.fetchall()
+    def setup_event_logger(self):
+        """Setup event logging system"""
+        self.events = []
         
-        if results:
-            print(f"Retrieved {len(results)} records from database_data for model {model_code}")
-            df = pd.DataFrame(results)
-            print(f"Database DataFrame shape: {df.shape}")
-            print(f"Database DataFrame columns (first 10): {list(df.columns)[:10]}")
-            
-            # Show date range of historical data for traceability
-            if 'DATE' in df.columns:
-                dates = df['DATE'].dropna()
-                if not dates.empty:
-                    print(f"Historical data date range: {dates.min()} to {dates.max()}")
-                    print(f"Sample dates: {dates.head(3).tolist()}")
-            
-            # Show PASS_NG distribution to confirm filtering
-            if 'PASS_NG' in df.columns:
-                pass_ng_counts = df['PASS_NG'].value_counts()
-                print(f"PASS_NG distribution: {pass_ng_counts.to_dict()}")
-            
-            cursor.close()
-            connection.close()
-            return df
-        else:
-            print(f"No records found in database_data for model {model_code}")
-            cursor.close()
-            connection.close()
-            return None
-            
-    except Exception as e:
-        print(f"Error querying database_data table: {e}")
-        if connection:
-            connection.close()
-        return None
-
-
-def calculate_rod_blk_deviations(database_df, combined_df):
-    """
-    Calculate deviations for Rod_Blk material using the formula:
-    (Average of 100 historical database_data rows - Data from DataFrame) / Average of 100 historical database_data rows
-    
-    Args:
-        database_df: DataFrame with database data (100 historical records)
-        combined_df: Combined DataFrame with checksheet and inspection data
+    def setup_event_logger_widget(self, parent):
+        """Setup the event logger widget"""
+        # Text widget with scrollbar for event log
+        log_frame = ttk.Frame(parent)
+        log_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        log_frame.columnconfigure(0, weight=1)
+        log_frame.rowconfigure(0, weight=1)
         
-    Returns:
-        DataFrame with deviation calculations
-    """
-    import re  # Import re at the top of the function
-    
-    print("\n=== CALCULATING ROD_BLK DEVIATIONS ===")
-    
-    if database_df is None or database_df.empty:
-        print("Database DataFrame is empty")
-        return None
-    
-    if combined_df.empty:
-        print("Combined DataFrame is empty")
-        return None
-    
-    print(f"Database DataFrame shape: {database_df.shape}")
-    print(f"Combined DataFrame shape: {combined_df.shape}")
-    
-    # Find Rod_Blk related columns in database_data
-    rod_blk_columns = [col for col in database_df.columns if 'Rod_Blk' in col or 'rod' in col.lower()]
-    print(f"Found {len(rod_blk_columns)} Rod_Blk related columns in database_data:")
-    for col in rod_blk_columns[:10]:  # Show first 10
-        print(f"  - {col}")
-    
-    # Calculate averages for Rod_Blk columns from database_data
-    database_averages = {}
-    for col in rod_blk_columns:
+        self.log_text = tk.Text(log_frame, height=8, wrap=tk.WORD)
+        log_scrollbar = ttk.Scrollbar(log_frame, orient=tk.VERTICAL, command=self.log_text.yview)
+        self.log_text.configure(yscrollcommand=log_scrollbar.set)
+        
+        self.log_text.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        log_scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
+        
+    def log_event(self, message, level="INFO"):
+        """Log an event to the event logger"""
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        log_entry = f"[{timestamp}] [{level}] {message}"
+        
+        self.events.append(log_entry)
+        self.log_text.insert(tk.END, log_entry + "\n")
+        self.log_text.see(tk.END)
+        
+        # Update status label
+        self.status_label.config(text=message[:50] + "..." if len(message) > 50 else message)
+        
+        self.root.update_idletasks()
+        
+    def run_material_script(self, script_name, material_name):
+        """Run a material processing script and return results"""
         try:
-            # Convert to numeric and calculate mean
-            numeric_values = pd.to_numeric(database_df[col], errors='coerce')
-            valid_values = numeric_values.dropna()
+            self.log_event(f"Starting {material_name} analysis...")
             
-            if len(valid_values) > 0:
-                avg_value = valid_values.mean()
-                database_averages[col] = avg_value
-                print(f"  {col}: {avg_value:.4f} (from {len(valid_values)} valid values)")
-        except Exception as e:
-            print(f"  Error processing {col}: {e}")
-    
-    print(f"Calculated averages for {len(database_averages)} database columns")
-    
-    # Find ALL columns in combined DataFrame and try to convert them to numeric
-    print(f"All combined DataFrame columns: {list(combined_df.columns)}")
-    
-    # Try to convert all columns to numeric to find potential matches
-    # Look across ALL rows to find the first non-null numeric value for each column
-    combined_numeric_data = {}
-    for col in combined_df.columns:
-        if col not in ['Material_Lot_Number', 'Lot_Number', 'Prod_Date', 'QR_CODE', 'JO_NUMBER', 'Data_Source']:
-            try:
-                # Look for the first non-null value across all rows
-                numeric_value = None
-                for idx in range(len(combined_df)):
-                    raw_value = combined_df[col].iloc[idx]
-                    if pd.notna(raw_value):
-                        numeric_value = pd.to_numeric(raw_value, errors='coerce')
-                        if pd.notna(numeric_value):
-                            combined_numeric_data[col] = numeric_value
-                            print(f"  Found numeric data: {col} = {numeric_value} (row {idx})")
-                            break
-                
-                if col not in combined_numeric_data:
-                    print(f"  No numeric data found for: {col}")
-            except Exception as e:
-                print(f"  Could not convert {col}: {e}")
-    
-    print(f"Found {len(combined_numeric_data)} convertible numeric columns in combined DataFrame")
-    print(f"All numeric column names: {list(combined_numeric_data.keys())}")
-    
-    # Calculate deviations with precise column matching
-    deviation_results = []
-    
-    for db_col, db_avg in database_averages.items():
-        if db_avg != 0:  # Avoid division by zero
-            matched_col = None
-            combined_value = None
-            
-            # Strategy 1: Tesla measurements from checksheet table (rdb5200200_checksheet)
-            # Pattern: Process_2_Rod_Blk_Tesla_X_Type_Data -> Rod_Blk_Tesla_X_Type_Data
-            if 'Tesla' in db_col:
-                match = re.search(r'Process_2_Rod_Blk_Tesla_(\d+)_(\w+)_Data', db_col)
-                if match:
-                    tesla_num, data_type = match.groups()
-                    
-                    # Try multiple Tesla column name patterns
-                    possible_cols = [
-                        f'Rod_Blk_Tesla_{tesla_num}_{data_type}_Data',  # Full name
-                        f'Rod_Blk_Tesla_{tesla_num}_Max_Data' if data_type == 'Maximum' else f'Rod_Blk_Tesla_{tesla_num}_{data_type}_Data',  # Max instead of Maximum
-                        f'Rod_Blk_Tesla_{tesla_num}_Min_Data' if data_type == 'Minimum' else f'Rod_Blk_Tesla_{tesla_num}_{data_type}_Data',  # Min instead of Minimum
-                        f'Rod_Blk_Tesla_{tesla_num}_Avg_Data' if data_type == 'Average' else f'Rod_Blk_Tesla_{tesla_num}_{data_type}_Data'   # Avg instead of Average
-                    ]
-                    
-                    matched_col = None
-                    combined_value = None
-                    
-                    for expected_col in possible_cols:
-                        if expected_col in combined_numeric_data:
-                            matched_col = expected_col
-                            combined_value = combined_numeric_data[expected_col]
-                            print(f"  ✓ Tesla match: {db_col} -> {matched_col}")
-                            break
-                    
-                    if not matched_col:
-                        # Debug: Show available Tesla columns
-                        available_tesla_cols = [col for col in combined_numeric_data.keys() if 'Tesla' in col and tesla_num in col]
-                        print(f"  ✗ Expected Tesla column not found for {db_col}")
-                        print(f"    Tried: {possible_cols}")
-                        print(f"    Available Tesla_{tesla_num} columns: {available_tesla_cols}")
-            
-            # Strategy 2: Inspection measurements from inspection table (rd05200200_inspection)
-            # Pattern: Process_2_Rod_Blk_Inspection_X_Type_Data -> Inspection_X_Type
-            elif 'Inspection' in db_col:
-                match = re.search(r'Process_2_Rod_Blk_Inspection_(\d+)_(\w+)_Data', db_col)
-                if match:
-                    insp_num, data_type = match.groups()
-                    
-                    # Build expected inspection column name (exact format from rd05200200_inspection table)
-                    expected_col = f'Inspection_{insp_num}_{data_type}'
-                    
-                    if expected_col in combined_numeric_data:
-                        matched_col = expected_col
-                        combined_value = combined_numeric_data[expected_col]
-                        print(f"  ✓ Inspection match: {db_col} -> {matched_col}")
-                    else:
-                        # Debug: Show what inspection columns are actually available
-                        available_inspection_cols = [col for col in combined_numeric_data.keys() if 'Inspection' in col]
-                        print(f"  ✗ Expected inspection column not found: {expected_col}")
-                        print(f"    Available inspection columns: {available_inspection_cols}")
-            
-            # Strategy 3: Direct match for any other columns
-            elif db_col in combined_numeric_data:
-                matched_col = db_col
-                combined_value = combined_numeric_data[db_col]
-                print(f"  ✓ Direct match: {db_col} -> {matched_col}")
-            
-            # Strategy 4: Fallback - try to find similar column names
+            if script_name == "frame":
+                result = frame.process_material_data()
+            elif script_name == "csb_data_output":
+                result = csb_data_output.process_material_data()
+            elif script_name == "rod_blk_output":
+                result = rod_blk_output.process_material_data()
+            elif script_name == "em_material":
+                result = em_material.process_material_data()
             else:
-                # Remove Process_2_Rod_Blk_ prefix and _Data suffix to find base pattern
-                base_pattern = db_col.replace('Process_2_Rod_Blk_', '').replace('_Data', '')
-                
-                for comb_col, comb_val in combined_numeric_data.items():
-                    if base_pattern in comb_col or comb_col in base_pattern:
-                        matched_col = comb_col
-                        combined_value = comb_val
-                        print(f"  ✓ Pattern match: {db_col} -> {matched_col} (base: {base_pattern})")
-                        break
-                
-                if not matched_col:
-                    print(f"  ✗ No match found for: {db_col}")
+                raise ValueError(f"Unknown script: {script_name}")
             
-            # If we found a match, calculate deviation
-            if matched_col and combined_value is not None:
-                try:
-                    # Calculate deviation
-                    deviation = (db_avg - combined_value) / db_avg
-                    
-                    deviation_results.append({
-                        'Database_Column': db_col,
-                        'Combined_Column': matched_col,
-                        'Database_Average': db_avg,
-                        'Combined_Value': combined_value,
-                        'Deviation': deviation
-                    })
-                    
-                    print(f"  ✓ Deviation calculated: {db_col} -> {matched_col} = {deviation:.6f}")
-                except Exception as e:
-                    print(f"  Error calculating deviation for {db_col}: {e}")
+            if result and 'deviation_data' in result and result['deviation_data'] is not None:
+                deviation_df = result['deviation_data']
+                self.log_event(f"{material_name} analysis completed. Found {len(deviation_df)} deviation records.")
+                return deviation_df
+            else:
+                self.log_event(f"{material_name} analysis completed but no deviation data found.", "WARNING")
+                return pd.DataFrame()
+                
+        except Exception as e:
+            self.log_event(f"Error running {material_name} analysis: {str(e)}", "ERROR")
+            return pd.DataFrame()
     
-    if deviation_results:
-        deviation_df = pd.DataFrame(deviation_results)
-        print(f"\nCalculated {len(deviation_results)} deviations")
-        print("Sample deviation results:")
-        print(deviation_df.head())
-        return deviation_df
-    else:
-        print("No deviations calculated")
-        return pd.DataFrame()
-
-
-def create_rod_blk_excel_output(combined_df, deviation_df, database_df, filename="rod_blk_output.xlsx"):
-    """
-    Create Excel output for Rod_Blk data following the format from frame.py.
-    
-    Args:
-        combined_df: Combined DataFrame with checksheet and inspection data
-        deviation_df: DataFrame with deviation calculations
-        database_df: DataFrame with database data
-        filename: Name of the Excel file to create
-    """
-    try:
-        print(f"\n=== CREATING ROD_BLK EXCEL OUTPUT ===")
+    def refresh_data(self):
+        """Refresh data from all material scripts"""
+        def refresh_thread():
+            try:
+                self.progress_var.set(0)
+                self.log_event("Starting data refresh for all materials...")
+                
+                # Material scripts mapping
+                materials = [
+                    ("frame", "Frame"),
+                    ("csb_data_output", "CSB"),
+                    ("rod_blk_output", "Rod Block"),
+                    ("em_material", "EM Material")
+                ]
+                
+                self.all_deviation_data = {}
+                total_materials = len(materials)
+                
+                for i, (script_name, material_name) in enumerate(materials):
+                    self.progress_var.set((i / total_materials) * 100)
+                    
+                    deviation_df = self.run_material_script(script_name, material_name)
+                    if not deviation_df.empty:
+                        self.all_deviation_data[material_name] = deviation_df
+                        
+                        # Log to comprehensive file
+                        self.log_to_comprehensive_file(deviation_df, material_name)
+                    
+                self.progress_var.set(100)
+                self.log_event("Data refresh completed for all materials.")
+                
+                # Update table display
+                self.update_table_display()
+                
+            except Exception as e:
+                self.log_event(f"Error during data refresh: {str(e)}", "ERROR")
+            finally:
+                self.progress_var.set(0)
         
-        with pd.ExcelWriter(filename, engine='xlsxwriter') as writer:
-            sheets_created = 0
+        # Run in separate thread to prevent GUI freezing
+        thread = threading.Thread(target=refresh_thread)
+        thread.daemon = True
+        thread.start()
+    
+    def log_to_comprehensive_file(self, deviation_df, material_name):
+        """Log deviation data to comprehensive Excel file"""
+        try:
+            # Add timestamp and material info
+            deviation_df_copy = deviation_df.copy()
+            deviation_df_copy['Timestamp'] = datetime.datetime.now()
+            deviation_df_copy['Material_Type'] = material_name
             
-            # Sheet 1: Rod_Blk Deviations
-            if not deviation_df.empty:
-                deviation_df.to_excel(writer, sheet_name='Rod_Blk_Deviations', index=False)
-                sheets_created += 1
-                print(f"  Created 'Rod_Blk_Deviations' sheet with {len(deviation_df)} rows")
+            # Check if file exists
+            if os.path.exists(self.deviation_log_file):
+                # Append to existing file
+                existing_df = pd.read_excel(self.deviation_log_file)
+                combined_df = pd.concat([existing_df, deviation_df_copy], ignore_index=True)
+            else:
+                combined_df = deviation_df_copy
             
-            # Sheet 2: Combined Data (Checksheet + Inspection)
-            if not combined_df.empty:
-                combined_df.to_excel(writer, sheet_name='Combined_Data', index=False)
-                sheets_created += 1
-                print(f"  Created 'Combined_Data' sheet with {len(combined_df)} rows")
+            # Save to Excel
+            combined_df.to_excel(self.deviation_log_file, index=False)
+            self.log_event(f"Logged {len(deviation_df)} {material_name} deviations to comprehensive file.")
             
-            # Sheet 3: Database Data
-            if database_df is not None and not database_df.empty:
-                database_df.to_excel(writer, sheet_name='Database_Data', index=False)
-                sheets_created += 1
-                print(f"  Created 'Database_Data' sheet with {len(database_df)} rows")
+        except Exception as e:
+            self.log_event(f"Error logging to comprehensive file: {str(e)}", "ERROR")
+    
+    def update_table_display(self):
+        """Update the table display based on selected material"""
+        try:
+            # Clear existing data
+            for item in self.tree.get_children():
+                self.tree.delete(item)
             
-            print(f"\nExcel file '{filename}' created successfully with {sheets_created} sheets!")
+            selected = self.selected_material.get()
+            
+            if selected == "":
+                # Show critical deviations (>0.03 or <-0.03) from all materials
+                self.display_critical_deviations()
+            else:
+                # Show all data for selected material
+                self.display_material_data(selected)
+                
+        except Exception as e:
+            self.log_event(f"Error updating table display: {str(e)}", "ERROR")
     
-    except Exception as e:
-        print(f"Error creating Excel file: {e}")
-        import traceback
-        traceback.print_exc()
-
-
-def process_rod_blk_material_data():
-    """
-    Main function to process Rod_Blk material data following the workflow:
-    CSV -> process2_data -> rdb5200200_checksheet -> rd05200200_inspection -> Combined DataFrame -> Deviation Calculation -> Excel Output
-    """
-    print("=== STARTING ROD_BLK MATERIAL DATA PROCESSING ===")
+    def display_critical_deviations(self):
+        """Display only critical deviations from all materials"""
+        # Configure columns for critical view
+        columns = ("Column", "Deviation", "Material")
+        self.tree["columns"] = columns
+        
+        for col in columns:
+            self.tree.heading(col, text=col)
+            # Right align specific columns
+            if col in ["Deviation", "Material", "S/N"]:
+                self.tree.column(col, width=150, anchor='e')  # 'e' = east (right align)
+            else:
+                self.tree.column(col, width=150, anchor='w')  # 'w' = west (left align)
+        
+        critical_data = []
+        
+        for material_name, deviation_df in self.all_deviation_data.items():
+            if not deviation_df.empty and 'Deviation' in deviation_df.columns:
+                # Filter critical deviations
+                critical_mask = (abs(deviation_df['Deviation']) > 0.03)
+                critical_deviations = deviation_df[critical_mask]
+                
+                for _, row in critical_deviations.iterrows():
+                    critical_data.append({
+                        'Column': row.get('Column', 'N/A'),
+                        'Deviation': f"{row.get('Deviation', 0):.4f}",
+                        'Material': material_name
+                    })
+        
+        # Sort by absolute deviation value
+        critical_data.sort(key=lambda x: abs(float(x['Deviation'])), reverse=True)
+        
+        # Insert into tree
+        for data in critical_data:
+            self.tree.insert("", tk.END, values=(data['Column'], data['Deviation'], data['Material']))
+        
+        self.current_table_data = pd.DataFrame(critical_data)
+        self.log_event(f"Displaying {len(critical_data)} critical deviations (>0.03 or <-0.03)")
     
-    # Step 1: Read CSV data
-    print("\n1. Reading CSV data...")
-    csv_data = read_csv_with_pandas(FILEPATH)
+    def display_material_data(self, material_key):
+        """Display all data for a specific material"""
+        # Map radio button values to material names
+        material_mapping = {
+            "Frame": "Frame",
+            "CSB": "CSB", 
+            "Rod_Blk": "Rod Block",
+            "Em": "EM Material"
+        }
+        
+        material_name = material_mapping.get(material_key, material_key)
+        
+        if material_name not in self.all_deviation_data:
+            self.log_event(f"No data available for {material_name}", "WARNING")
+            return
+        
+        deviation_df = self.all_deviation_data[material_name]
+        
+        if deviation_df.empty:
+            self.log_event(f"No deviation data for {material_name}", "WARNING")
+            return
+        
+        # Configure columns for detailed view
+        available_columns = list(deviation_df.columns)
+        desired_columns = ["Column", "Database Average", "Inspection Value", "Deviation", "Material", "S/N", "Matched Inspection Column"]
+        
+        # Use available columns that match desired columns
+        display_columns = [col for col in desired_columns if col in available_columns]
+        
+        self.tree["columns"] = display_columns
+        
+        for col in display_columns:
+            self.tree.heading(col, text=col)
+            # Right align specific columns for better readability
+            if col in ["Deviation", "Material", "S/N", "Database Average", "Inspection Value"]:
+                self.tree.column(col, width=120, anchor='e')  # 'e' = east (right align)
+            else:
+                self.tree.column(col, width=120, anchor='w')  # 'w' = west (left align)
+        
+        # Insert data
+        for _, row in deviation_df.iterrows():
+            values = []
+            for col in display_columns:
+                value = row.get(col, 'N/A')
+                if col == "Deviation" and isinstance(value, (int, float)):
+                    value = f"{value:.4f}"
+                elif col in ["Database Average", "Inspection Value"] and isinstance(value, (int, float)):
+                    value = f"{value:.3f}"
+                values.append(str(value))
+            
+            self.tree.insert("", tk.END, values=values)
+        
+        self.current_table_data = deviation_df[display_columns].copy()
+        self.log_event(f"Displaying {len(deviation_df)} records for {material_name}")
     
-    if csv_data is None or csv_data.empty:
-        print("Failed to read CSV data or no data found")
-        return None
+    def save_selected_results(self):
+        """Save currently displayed table results to Excel"""
+        try:
+            if self.current_table_data.empty:
+                messagebox.showwarning("No Data", "No data to save. Please refresh data first.")
+                return
+            
+            # Generate filename based on selection
+            selected = self.selected_material.get()
+            if selected == "":
+                filename = "critical_deviations.xlsx"
+            else:
+                filename = f"{selected.lower()}_deviations.xlsx"
+            
+            filepath = os.path.join(os.path.expanduser("~"), "Desktop", filename)
+            
+            # Save to Excel
+            self.current_table_data.to_excel(filepath, index=False)
+            
+            self.log_event(f"Saved {len(self.current_table_data)} records to {filename}")
+            messagebox.showinfo("Success", f"Results saved to Desktop/{filename}")
+            
+        except Exception as e:
+            self.log_event(f"Error saving selected results: {str(e)}", "ERROR")
+            messagebox.showerror("Error", f"Failed to save results: {str(e)}")
     
-    # Extract required values
-    process_sn_list = csv_data['PROCESS S/N'].tolist()
-    model_code = csv_data['MODEL CODE'].iloc[0]
-    csv_date = csv_data['DATE'].iloc[0]
+    def save_all_results(self):
+        """Save all deviation results to Excel"""
+        try:
+            if not self.all_deviation_data:
+                messagebox.showwarning("No Data", "No data to save. Please refresh data first.")
+                return
+            
+            filepath = os.path.join(os.path.expanduser("~"), "Desktop", "all_material_deviations.xlsx")
+            
+            with pd.ExcelWriter(filepath, engine='openpyxl') as writer:
+                for material_name, deviation_df in self.all_deviation_data.items():
+                    if not deviation_df.empty:
+                        sheet_name = material_name.replace(" ", "_")[:31]  # Excel sheet name limit
+                        deviation_df.to_excel(writer, sheet_name=sheet_name, index=False)
+            
+            total_records = sum(len(df) for df in self.all_deviation_data.values())
+            self.log_event(f"Saved all results ({total_records} total records) to all_material_deviations.xlsx")
+            messagebox.showinfo("Success", f"All results saved to Desktop/all_material_deviations.xlsx")
+            
+        except Exception as e:
+            self.log_event(f"Error saving all results: {str(e)}", "ERROR")
+            messagebox.showerror("Error", f"Failed to save all results: {str(e)}")
     
-    print(f"Process S/N list: {process_sn_list}")
-    print(f"Model Code: {model_code}")
-    print(f"CSV Date: {csv_date}")
+    def set_csv_file_path(self):
+        """Allow user to select CSV file for monitoring"""
+        file_path = filedialog.askopenfilename(
+            title="Select CSV File to Monitor",
+            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
+            initialdir=r"\\192.168.2.19\ai_team\AI Program\Outputs\PICompiled"
+        )
+        
+        if file_path:
+            self.csv_file_path = file_path
+            filename = os.path.basename(file_path)
+            self.csv_path_label.config(text=f"Monitoring: {filename}", foreground="blue")
+            self.log_event(f"CSV file path set to: {file_path}")
+            
+            # Initialize hash for change detection
+            self.last_csv_hash = self.get_file_hash(file_path)
     
-    # Step 2: Get Rod_Blk lot numbers from process2_data
-    print("\n2. Getting Rod_Blk lot numbers from process2_data...")
-    rod_blk_lot_mapping = get_rod_blk_lot_from_process_data(process_sn_list, csv_date)
+    def get_file_hash(self, file_path):
+        """Calculate MD5 hash of file for change detection"""
+        try:
+            hash_md5 = hashlib.md5()
+            with open(file_path, "rb") as f:
+                for chunk in iter(lambda: f.read(4096), b""):
+                    hash_md5.update(chunk)
+            return hash_md5.hexdigest()
+        except Exception as e:
+            self.log_event(f"Error calculating file hash: {str(e)}", "ERROR")
+            return None
     
-    if not rod_blk_lot_mapping:
-        print("No Rod_Blk lot numbers found")
-        return None
-    
-    # Step 3: Get checksheet data using Rod_Blk lot numbers as Prod_Date
-    print("\n3. Getting checksheet data...")
-    checksheet_df = get_checksheet_data_by_prod_date(rod_blk_lot_mapping)
-    
-    # Step 4: Get inspection data using Material_Lot_Number as Lot_Number, filtered by CSV date
-    print("\n4. Getting inspection data...")
-    inspection_df = get_inspection_data_by_lot_number(checksheet_df, csv_date)
-    
-    # Step 5: Combine checksheet and inspection data
-    print("\n5. Combining checksheet and inspection data...")
-    combined_df = combine_checksheet_and_inspection_data(checksheet_df, inspection_df)
-    
-    if combined_df.empty:
-        print("No combined data available")
-        return None
-    
-    # Step 6: Get database data for model
-    print("\n6. Getting database data...")
-    database_df = get_database_data_for_model(model_code, 300)
-    
-    # Step 7: Calculate deviations
-    print("\n7. Calculating deviations...")
-    deviation_df = calculate_rod_blk_deviations(database_df, combined_df)
-    
-    # Step 8: Create Excel output
-    print("\n8. Creating Excel output...")
-    create_rod_blk_excel_output(combined_df, deviation_df, database_df)
-    
-    print("\n=== ROD_BLK PROCESSING COMPLETED ===")
-    return {
-        'combined_data': combined_df,
-        'deviation_data': deviation_df,
-        'database_data': database_df
-    }
-
-
-# %%
-# Simple execution cell - Run this after running all the function definitions above
-result = process_rod_blk_material_data()
-
-if result:
-    print("\n=== PROCESSING RESULTS SUMMARY ===")
-    print(f"Combined data shape: {result['combined_data'].shape}")
-    if result['deviation_data'] is not None and not result['deviation_data'].empty:
-        print(f"Deviation calculations: {len(result['deviation_data'])} deviations calculated")
-    else:
-        print("No deviation calculations performed")
-    if result['database_data'] is not None:
-        print(f"Database data shape: {result['database_data'].shape}")
-    print("\nExcel file 'rod_blk_output.xlsx' has been created!")
-else:
-    print("Processing failed - no results generated")
-
-# %%
-# Alternative: Main execution with if __name__ check
-if __name__ == "__main__":
-    # Run the Rod_Blk material data processing
-    result = process_rod_blk_material_data()
-    
-    if result:
-        print("\n=== PROCESSING RESULTS SUMMARY ===")
-        print(f"Combined data shape: {result['combined_data'].shape}")
-        if result['deviation_data'] is not None and not result['deviation_data'].empty:
-            print(f"Deviation calculations: {len(result['deviation_data'])} deviations calculated")
+    def toggle_monitoring(self):
+        """Enable or disable CSV file monitoring"""
+        if self.auto_monitoring.get():
+            self.start_monitoring()
         else:
-            print("No deviation calculations performed")
-        if result['database_data'] is not None:
-            print(f"Database data shape: {result['database_data'].shape}")
-        print("\nExcel file 'rod_blk_output.xlsx' has been created!")
-    else:
-        print("Processing failed - no results generated")
+            self.stop_monitoring()
+    
+    def start_monitoring(self):
+        """Start monitoring the CSV file for changes"""
+        if not os.path.exists(self.csv_file_path):
+            messagebox.showerror("Error", f"CSV file not found: {self.csv_file_path}")
+            self.auto_monitoring.set(False)
+            return
+        
+        try:
+            # Set up file system observer
+            self.file_observer = Observer()
+            event_handler = CSVFileHandler(self)
+            
+            # Watch the directory containing the CSV file
+            watch_dir = os.path.dirname(self.csv_file_path)
+            self.file_observer.schedule(event_handler, watch_dir, recursive=False)
+            self.file_observer.start()
+            
+            self.log_event(f"Started monitoring CSV file: {os.path.basename(self.csv_file_path)}")
+            self.status_label.config(text="Auto-monitoring ACTIVE", foreground="orange")
+            
+        except Exception as e:
+            self.log_event(f"Error starting file monitoring: {str(e)}", "ERROR")
+            self.auto_monitoring.set(False)
+            messagebox.showerror("Error", f"Failed to start monitoring: {str(e)}")
+    
+    def stop_monitoring(self):
+        """Stop monitoring the CSV file"""
+        if self.file_observer:
+            self.file_observer.stop()
+            self.file_observer.join()
+            self.file_observer = None
+        
+        self.log_event("Stopped CSV file monitoring")
+        self.status_label.config(text="Auto-monitoring STOPPED", foreground="red")
+    
+    def process_csv_change(self):
+        """Process CSV file changes automatically"""
+        try:
+            if not os.path.exists(self.csv_file_path):
+                self.log_event("CSV file no longer exists", "ERROR")
+                return
+            
+            # Check if file actually changed using hash
+            current_hash = self.get_file_hash(self.csv_file_path)
+            if current_hash == self.last_csv_hash:
+                self.log_event("False alarm - CSV file unchanged")
+                return
+            
+            self.last_csv_hash = current_hash
+            self.log_event("CSV file change confirmed - processing new data...")
+            
+            # Read the last row of the CSV file
+            csv_data = self.read_csv_tail()
+            if csv_data is None:
+                return
+            
+            # Update material scripts with new CSV data
+            self.update_material_scripts_csv_path()
+            
+            # Run automatic processing
+            self.auto_process_materials()
+            
+        except Exception as e:
+            self.log_event(f"Error processing CSV change: {str(e)}", "ERROR")
+    
+    def read_csv_tail(self):
+        """Read the last row of the CSV file"""
+        try:
+            df = pd.read_csv(self.csv_file_path)
+            if df.empty:
+                self.log_event("CSV file is empty", "WARNING")
+                return None
+            
+            # Get the last row
+            last_row = df.tail(1)
+            self.log_event(f"Read CSV tail - Last row contains S/N: {last_row['S/N'].iloc[0] if 'S/N' in last_row.columns else 'N/A'}")
+            return last_row
+            
+        except Exception as e:
+            self.log_event(f"Error reading CSV file: {str(e)}", "ERROR")
+            return None
+    
+    def update_material_scripts_csv_path(self):
+        """Update the CSV file path in all material scripts"""
+        try:
+            # Update the FILEPATH variable in each material script
+            new_filename = os.path.basename(self.csv_file_path)
+            
+            # This would require modifying the material scripts to accept dynamic file paths
+            # For now, log the action
+            self.log_event(f"Updated material scripts to use: {new_filename}")
+            
+        except Exception as e:
+            self.log_event(f"Error updating material scripts: {str(e)}", "ERROR")
+    
+    def auto_process_materials(self):
+        """Automatically process all materials when CSV changes"""
+        def auto_process_thread():
+            try:
+                self.log_event("=== AUTOMATIC PROCESSING STARTED ===", "INFO")
+                self.progress_var.set(0)
+                
+                # Material scripts mapping
+                materials = [
+                    ("frame", "Frame"),
+                    ("csb_data_output", "CSB"),
+                    ("rod_blk_output", "Rod Block"),
+                    ("em_material", "EM Material")
+                ]
+                
+                auto_deviation_data = {}
+                total_materials = len(materials)
+                
+                for i, (script_name, material_name) in enumerate(materials):
+                    self.progress_var.set((i / total_materials) * 100)
+                    
+                    deviation_df = self.run_material_script(script_name, material_name)
+                    if not deviation_df.empty:
+                        auto_deviation_data[material_name] = deviation_df
+                
+                self.progress_var.set(100)
+                
+                # Create critical deviations log
+                self.create_critical_deviations_log(auto_deviation_data)
+                
+                # Update main data storage
+                self.all_deviation_data.update(auto_deviation_data)
+                
+                # Update table display
+                self.update_table_display()
+                
+                self.log_event("=== AUTOMATIC PROCESSING COMPLETED ===", "INFO")
+                
+            except Exception as e:
+                self.log_event(f"Error during automatic processing: {str(e)}", "ERROR")
+            finally:
+                self.progress_var.set(0)
+        
+        # Run in separate thread
+        thread = threading.Thread(target=auto_process_thread)
+        thread.daemon = True
+        thread.start()
+    
+    def create_critical_deviations_log(self, deviation_data):
+        """Create Excel log file with critical deviations only"""
+        try:
+            critical_data = []
+            timestamp = datetime.datetime.now()
+            
+            for material_name, deviation_df in deviation_data.items():
+                if not deviation_df.empty and 'Deviation' in deviation_df.columns:
+                    # Filter critical deviations (>0.03 or <-0.03)
+                    critical_mask = (abs(deviation_df['Deviation']) > 0.03)
+                    critical_deviations = deviation_df[critical_mask]
+                    
+                    for _, row in critical_deviations.iterrows():
+                        critical_data.append({
+                            'Timestamp': timestamp,
+                            'Material': material_name,
+                            'Column': row.get('Column', 'N/A'),
+                            'Database_Average': row.get('Database_Average', 'N/A'),
+                            'Inspection_Value': row.get('Inspection_Value', 'N/A'),
+                            'Deviation': row.get('Deviation', 0),
+                            'S/N': row.get('S/N', 'N/A'),
+                            'Severity': 'CRITICAL' if abs(row.get('Deviation', 0)) > 0.05 else 'WARNING'
+                        })
+            
+            if critical_data:
+                # Create or append to critical deviations log
+                critical_df = pd.DataFrame(critical_data)
+                
+                if os.path.exists(self.critical_deviations_log):
+                    # Append to existing file
+                    existing_df = pd.read_excel(self.critical_deviations_log)
+                    combined_df = pd.concat([existing_df, critical_df], ignore_index=True)
+                else:
+                    combined_df = critical_df
+                
+                # Save to Excel
+                combined_df.to_excel(self.critical_deviations_log, index=False)
+                
+                self.log_event(f"Critical deviations log updated: {len(critical_data)} new critical deviations found")
+                
+                # Show notification for critical deviations
+                if any(row['Severity'] == 'CRITICAL' for row in critical_data):
+                    self.log_event("⚠️ CRITICAL DEVIATIONS DETECTED ⚠️", "ERROR")
+            else:
+                self.log_event("No critical deviations found in automatic processing")
+                
+        except Exception as e:
+            self.log_event(f"Error creating critical deviations log: {str(e)}", "ERROR")
 
-#%% Test the perform_deviation_calculations function
-# if __name__ == "__main__":
-#     print("Testing new perform_deviation_calculations function...")
+#%%
+def main():
+    root = tk.Tk()
+    app = MaterialAnomalyGUI(root)
     
-#     # Create sample data for testing
-#     import pandas as pd
-#     import numpy as np
+    # Initial log message
+    app.log_event("Material Anomaly Detection System initialized")
+    app.log_event("Click 'Refresh Data' to load material analysis results")
     
-#     # Create sample database DataFrame with the required columns (including multiple processes)
-#     database_data = {
-#         # Process 1 columns
-#         'Process_1_Em2p_Inspection_3_Average_Data': np.random.normal(0.91, 0.05, 100),
-#         'Process_1_Em2p_Inspection_4_Average_Data': np.random.normal(0.38, 0.05, 100),
-#         'Process_1_Em2p_Inspection_5_Average_Data': np.random.normal(0.42, 0.05, 100),
-#         'Process_1_Em2p_Inspection_10_Average_Data': np.random.normal(2.14, 0.2, 100),
-#         'Process_1_Em2p_Inspection_3_Minimum_Data': np.random.normal(0.88, 0.05, 100),
-#         'Process_1_Em2p_Inspection_4_Minimum_Data': np.random.normal(0.31, 0.05, 100),
-#         'Process_1_Em2p_Inspection_5_Minimum_Data': np.random.normal(0.34, 0.05, 100),
-#         'Process_1_Em2p_Inspection_3_Maximum_Data': np.random.normal(0.96, 0.05, 100),
-#         'Process_1_Em2p_Inspection_4_Maximum_Data': np.random.normal(0.48, 0.05, 100),
-#         'Process_1_Em2p_Inspection_5_Maximum_Data': np.random.normal(0.50, 0.05, 100),
-#         # Process 2 columns (Rod_Blk and Df_Blk as shown in deviation_calculations.xlsx)
-#         'Process_2_Rod_Blk_Inspection_3_Average_Data': np.random.normal(13.55, 0.5, 100),
-#         'Process_2_Rod_Blk_Inspection_4_Average_Data': np.random.normal(7.94, 0.5, 100),
-#         'Process_2_Rod_Blk_Inspection_5_Average_Data': np.random.normal(7.94, 0.5, 100),
-#         'Process_2_Rod_Blk_Inspection_3_Minimum_Data': np.random.normal(13.50, 0.5, 100),
-#         'Process_2_Rod_Blk_Inspection_4_Minimum_Data': np.random.normal(7.93, 0.5, 100),
-#         'Process_2_Rod_Blk_Inspection_5_Minimum_Data': np.random.normal(7.92, 0.5, 100),
-#         'Process_2_Rod_Blk_Inspection_3_Maximum_Data': np.random.normal(13.58, 0.5, 100),
-#         'Process_2_Rod_Blk_Inspection_4_Maximum_Data': np.random.normal(7.96, 0.5, 100),
-#         'Process_2_Rod_Blk_Inspection_5_Maximum_Data': np.random.normal(7.95, 0.5, 100),
-#         'Process_2_Df_Blk_Inspection_3_Average_Data': np.random.normal(2.20, 0.1, 100),
-#         'Process_2_Df_Blk_Inspection_4_Average_Data': np.random.normal(7.07, 0.5, 100),
-#         'Process_2_Df_Blk_Inspection_3_Minimum_Data': np.random.normal(2.19, 0.1, 100),
-#         'Process_2_Df_Blk_Inspection_4_Minimum_Data': np.random.normal(7.05, 0.5, 100),
-#         'Process_2_Df_Blk_Inspection_3_Maximum_Data': np.random.normal(2.21, 0.1, 100),
-#         'Process_2_Df_Blk_Inspection_4_Maximum_Data': np.random.normal(7.09, 0.5, 100),
-#     }
-    
-#     database_df = pd.DataFrame(database_data)
-    
-#     # Create sample inspection DataFrame with dynamic column names
-#     inspection_data = {
-#         # Inspection 3 - Resistance type (Em2p material)
-#         'Inspection_3_Resistance_Minimum': [0.91],
-#         'Inspection_3_Resistance_Average': [0.91],
-#         'Inspection_3_Resistance_Maximum': [0.92],
-#         # Inspection 4 - Dimension type (Em2p material)
-#         'Inspection_4_Dimension_Minimum': [0.32],
-#         'Inspection_4_Dimension_Average': [0.36],
-#         'Inspection_4_Dimension_Maximum': [0.41],
-#         # Inspection 5 - Dimension type (Em2p material)
-#         'Inspection_5_Dimension_Minimum': [0.32],
-#         'Inspection_5_Dimension_Average': [0.37],
-#         'Inspection_5_Dimension_Maximum': [0.41],
-#         # Inspection 10 - Pull_Test type (Em2p material)
-#         'Inspection_10_Pull_Test': [2.15],
-#         # Additional dynamic columns for Rod_Blk material (different inspection types)
-#         'Inspection_3_Thickness_Minimum': [13.50],
-#         'Inspection_3_Thickness_Average': [13.55],
-#         'Inspection_3_Thickness_Maximum': [13.58],
-#         'Inspection_4_Width_Minimum': [7.93],
-#         'Inspection_4_Width_Average': [7.94],
-#         'Inspection_4_Width_Maximum': [7.96],
-#         'Inspection_5_Length_Minimum': [7.92],
-#         'Inspection_5_Length_Average': [7.94],
-#         'Inspection_5_Length_Maximum': [7.95],
-#         # Additional dynamic columns for Df_Blk material
-#         'Inspection_3_Height_Minimum': [2.19],
-#         'Inspection_3_Height_Average': [2.20],
-#         'Inspection_3_Height_Maximum': [2.21],
-#         'Inspection_4_Depth_Minimum': [7.05],
-#         'Inspection_4_Depth_Average': [7.07],
-#         'Inspection_4_Depth_Maximum': [7.09],
-#         'Lot_Number': ['CAT-5D24DI']
-#     }
-    
-#     inspection_df = pd.DataFrame(inspection_data)
-    
-#     # Test the function with filtered data (same as main execution)
-#     filtered_database_df = filter_inspection_columns(database_df)
-#     inspection_df_for_calc = inspection_df.drop(columns=['Material_Code', 'Lot_Number'], errors='ignore')
-    
-#     print(f"\n=== TEST: FILTERED DATA FOR DEVIATION CALCULATIONS ===")
-#     print(f"Filtered database shape: {filtered_database_df.shape}")
-#     print(f"Filtered database columns (first 10): {list(filtered_database_df.columns)[:10]}")
-#     print(f"Filtered inspection shape: {inspection_df_for_calc.shape}")
-#     print(f"Filtered inspection columns: {list(inspection_df_for_calc.columns)}")
-    
-#     result = perform_deviation_calculations(filtered_database_df, inspection_df_for_calc)
-    
-#     if result is not None and not result.empty:
-#         print("\nTest successful! Sample of results:")
-#         print(result.head())
-#         print(f"\nResult shape: {result.shape}")
-#     else:
-#         print("\nTest failed - no results returned")
+    root.mainloop()
 
-# # # %%
+if __name__ == "__main__":
+    main()
+
+#%%
