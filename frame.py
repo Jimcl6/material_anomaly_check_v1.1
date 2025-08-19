@@ -4,12 +4,15 @@ import pandas as pd
 from sqlalchemy import create_engine
 import mysql.connector
 import re
+import datetime
+
+x = datetime.datetime.now()
 
 pd.set_option('display.max_columns', None)  # Show all columns in DataFrame output
 
 NETWORK_DIR = r"\\192.168.2.19\ai_team\AI Program\Outputs\PICompiled"
-# FILENAME = f"PICompiled{x.year}-{x.strftime("%m")}-{x.strftime('%d')}.csv"
-FILENAME = f"PICompiled2025-07-11.csv"
+FILENAME = f"PICompiled{x.year}-{x.strftime("%m")}-{x.strftime('%d')}.csv"
+# FILENAME = f"PICompiled2025-07-11.csv"
 FILEPATH = os.path.join(NETWORK_DIR, FILENAME)
 DB_CONFIG = {
     'host': '192.168.2.148',
@@ -1242,7 +1245,7 @@ def perform_deviation_calculations(database_df, inspection_df, process_sn_list=N
                 matched_inspection_value = None
                 matched_column_name = None
                 matching_strategy = None
-                material_code = None
+                material_code = 'N/A'  # Default value to prevent KeyError
                 material_name = None
 
                 # Get material info from database column
@@ -1251,6 +1254,10 @@ def perform_deviation_calculations(database_df, inspection_df, process_sn_list=N
                         material_name = mat_name
                         material_code = mat_info['inspection_table'].replace('_inspection', '').upper()
                         break
+                
+                # Ensure material_code has a default value
+                if not material_code:
+                    material_code = 'UNKNOWN'
 
                 if material_code and material_name:
                     # Get inspection data for this material
@@ -1373,7 +1380,7 @@ def perform_deviation_calculations(database_df, inspection_df, process_sn_list=N
                         'Process_Number': process_num,
                         'Material': material,
                         'S/N': sn_list[0] if sn_list else 'N/A',
-                        'Material_Code': material_code,
+                        'Material_Code': material_code if material_code else 'N/A',
                         'Inspection_Number': inspection_num,
                         'Data_Type': data_type,
                         'Inspection_Table': material_patterns[material]['inspection_table'] if material in material_patterns else ''

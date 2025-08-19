@@ -11,8 +11,8 @@ x = datetime.datetime.now()
 pd.set_option('display.max_columns', None)  # Show all columns in DataFrame output
 
 NETWORK_DIR = r"\\192.168.2.19\ai_team\AI Program\Outputs\PICompiled"
-# FILENAME = f"PICompiled{x.year}-{x.strftime("%m")}-{x.strftime('%d')}.csv"
-FILENAME = f"PICompiled2025-07-11.csv"
+FILENAME = f"PICompiled{x.year}-{x.strftime("%m")}-{x.strftime('%d')}.csv"
+# FILENAME = f"PICompiled2025-07-11.csv"
 FILEPATH = os.path.join(NETWORK_DIR, FILENAME)
 DB_CONFIG = {
     'host': '192.168.2.148',
@@ -1052,7 +1052,7 @@ def perform_deviation_calculations(database_df, inspection_df, process_sn_list=N
                 matched_inspection_value = None
                 matched_column_name = None
                 matching_strategy = None
-                material_code = None
+                material_code = 'N/A'  # Default value to prevent KeyError
                 material_name = None
 
                 # Get material info from database column
