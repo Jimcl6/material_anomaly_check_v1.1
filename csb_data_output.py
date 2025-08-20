@@ -1052,7 +1052,7 @@ def perform_deviation_calculations(database_df, inspection_df, process_sn_list=N
                 matched_inspection_value = None
                 matched_column_name = None
                 matching_strategy = None
-                material_code = 'N/A'  # Default value to prevent KeyError
+                material_code = None
                 material_name = None
 
                 # Get material info from database column
