@@ -11,8 +11,8 @@ x = datetime.datetime.now()
 pd.set_option('display.max_columns', None)  # Show all columns in DataFrame output
 
 NETWORK_DIR = r"\\192.168.2.19\ai_team\AI Program\Outputs\PICompiled"
-FILENAME = f"PICompiled{x.year}-{x.strftime("%m")}-{x.strftime('%d')}.csv"
-# FILENAME = f"PICompiled2025-07-11.csv"
+# FILENAME = f"PICompiled{x.year}-{x.strftime("%m")}-{x.strftime('%d')}.csv"
+FILENAME = f"PICompiled2025-08-20.csv"
 FILEPATH = os.path.join(NETWORK_DIR, FILENAME)
 DB_CONFIG = {
     'host': '192.168.2.148',
@@ -820,7 +820,7 @@ def convert_to_numeric_safe(value, column_name=None):
         print(f"  [ERROR] Conversion failed: {str(e)}")
         return None, False
 
-def perform_deviation_calculations(database_df, inspection_df, process_sn_list=None, sn_list=None):
+def perform_deviation_calculations(database_df, inspection_df, process_sn_list=None, sn_list=None, csv_date=None):
     """
     Calculate deviation between database historical data and current inspection data for materials.
     
@@ -1173,25 +1173,29 @@ def perform_deviation_calculations(database_df, inspection_df, process_sn_list=N
                     # Add row to results with detailed information
                     results_data.append({
                         'Column': db_col,
-                        'Database_Average': db_avg,
-                        'Inspection_Value': matched_inspection_value,
-                        'Matched_Inspection_Column': matched_column_name,
-                        'Matching_Strategy': matching_strategy,
-                        'Lot_Number': lot_number,
+                        'Database Average': db_avg,
+                        'Inspection Value': matched_inspection_value,
                         'Deviation': deviation,
-                        'Process_Number': process_num,
                         'Material': material,
                         'S/N': sn_list[0] if sn_list else 'N/A',
                         'Material_Code': material_code,
                         'Inspection_Number': inspection_num,
                         'Data_Type': data_type,
+                        'Matched_Inspection_Column': matched_column_name,
+                        'Matching_Strategy': matching_strategy,
                         'Inspection_Table': material_patterns[material]['inspection_table'] if material in material_patterns else '',
-                        'Absolute_Deviation': abs(deviation)  # New field
+                        'Absolute_Deviation': abs(deviation)
                     })
     
     # Create DataFrame with results in the format matching deviation_calculations.xlsx
     if results_data:
         results_df = pd.DataFrame(results_data)
+        
+        # Add Date column from CSV if provided
+        if csv_date:
+            results_df['Date'] = csv_date
+        else:
+            results_df['Date'] = datetime.datetime.now().strftime('%Y/%m/%d')
         
         # Enhanced logging for final results
         print(f"\n=== DEVIATION CALCULATION RESULTS SUMMARY ===")
@@ -1401,7 +1405,7 @@ def process_material_data():
                     print(f"Filtered inspection shape: {inspection_df_for_calc.shape}")
                     print(f"Filtered inspection columns: {list(inspection_df_for_calc.columns)}")
                     
-                    deviation_df = perform_deviation_calculations(filtered_database_df, inspection_df_for_calc, process_sn_list, sn_list)
+                    deviation_df = perform_deviation_calculations(filtered_database_df, inspection_df_for_calc, process_sn_list, sn_list, csv_date)
                 
                 return {
                     'process_data': consolidated_df,

@@ -11,8 +11,8 @@ x = datetime.datetime.now()
 pd.set_option('display.max_columns', None)  # Show all columns in DataFrame output
 
 NETWORK_DIR = r"\\192.168.2.19\ai_team\AI Program\Outputs\PICompiled"
-FILENAME = f"PICompiled{x.year}-{x.strftime("%m")}-{x.strftime('%d')}.csv"
-# FILENAME = f"PICompiled2025-07-11.csv"
+# FILENAME = f"PICompiled{x.year}-{x.strftime("%m")}-{x.strftime('%d')}.csv"
+FILENAME = f"PICompiled2025-08-20.csv"
 FILEPATH = os.path.join(NETWORK_DIR, FILENAME)
 DB_CONFIG = {
     'host': '192.168.2.148',
@@ -553,7 +553,7 @@ def get_database_data_for_model(model_code, limit=100):
         return None
 
 
-def calculate_rod_blk_deviations(database_df, combined_df, process_sn_list=None, sn_list=None):
+def calculate_rod_blk_deviations(database_df, combined_df, process_sn_list=None, sn_list=None, csv_date=None):
     """
     Calculate deviations for Rod_Blk material using the formula:
     (Average of 100 historical database_data rows - Data from DataFrame) / Average of 100 historical database_data rows
@@ -633,7 +633,12 @@ def calculate_rod_blk_deviations(database_df, combined_df, process_sn_list=None,
     print(f"All numeric column names: {list(combined_numeric_data.keys())}")
     
     # Calculate deviations with precise column matching
-    deviation_results = []
+    all_columns = []
+    all_database_averages = []
+    all_inspection_values = []
+    all_deviations = []
+    all_materials = []
+    all_sns = []
     
     for db_col, db_avg in database_averages.items():
         if db_avg != 0:  # Avoid division by zero
@@ -662,13 +667,13 @@ def calculate_rod_blk_deviations(database_df, combined_df, process_sn_list=None,
                         if expected_col in combined_numeric_data:
                             matched_col = expected_col
                             combined_value = combined_numeric_data[expected_col]
-                            print(f"  ✓ Tesla match: {db_col} -> {matched_col}")
+                            print(f"  Tesla match: {db_col} -> {matched_col}")
                             break
                     
                     if not matched_col:
                         # Debug: Show available Tesla columns
                         available_tesla_cols = [col for col in combined_numeric_data.keys() if 'Tesla' in col and tesla_num in col]
-                        print(f"  ✗ Expected Tesla column not found for {db_col}")
+                        print(f"  Expected Tesla column not found for {db_col}")
                         print(f"    Tried: {possible_cols}")
                         print(f"    Available Tesla_{tesla_num} columns: {available_tesla_cols}")
             
@@ -685,18 +690,18 @@ def calculate_rod_blk_deviations(database_df, combined_df, process_sn_list=None,
                     if expected_col in combined_numeric_data:
                         matched_col = expected_col
                         combined_value = combined_numeric_data[expected_col]
-                        print(f"  ✓ Inspection match: {db_col} -> {matched_col}")
+                        print(f"  Inspection match: {db_col} -> {matched_col}")
                     else:
                         # Debug: Show what inspection columns are actually available
                         available_inspection_cols = [col for col in combined_numeric_data.keys() if 'Inspection' in col]
-                        print(f"  ✗ Expected inspection column not found: {expected_col}")
+                        print(f"  Expected inspection column not found: {expected_col}")
                         print(f"    Available inspection columns: {available_inspection_cols}")
             
             # Strategy 3: Direct match for any other columns
             elif db_col in combined_numeric_data:
                 matched_col = db_col
                 combined_value = combined_numeric_data[db_col]
-                print(f"  ✓ Direct match: {db_col} -> {matched_col}")
+                print(f"  Direct match: {db_col} -> {matched_col}")
             
             # Strategy 4: Fallback - try to find similar column names
             else:
@@ -707,11 +712,11 @@ def calculate_rod_blk_deviations(database_df, combined_df, process_sn_list=None,
                     if base_pattern in comb_col or comb_col in base_pattern:
                         matched_col = comb_col
                         combined_value = comb_val
-                        print(f"  ✓ Pattern match: {db_col} -> {matched_col} (base: {base_pattern})")
+                        print(f"  Pattern match: {db_col} -> {matched_col} (base: {base_pattern})")
                         break
                 
                 if not matched_col:
-                    print(f"  ✗ No match found for: {db_col}")
+                    print(f"  No match found for: {db_col}")
             
             # If we found a match, calculate deviation
             if matched_col and combined_value is not None:
@@ -719,33 +724,37 @@ def calculate_rod_blk_deviations(database_df, combined_df, process_sn_list=None,
                     # Calculate deviation
                     deviation = (db_avg - combined_value) / db_avg
                     
-                    deviation_results.append({
-                        'Column': db_col,
-                        'Database_Average': db_avg,
-                        'Inspection_Value': combined_value,
-                        'Matched_Inspection_Column': matched_col,
-                        'Matching_Strategy': 'Rod_Blk Pattern Matching',
-                        'Lot_Number': 'N/A',
-                        'Deviation': deviation,
-                        'Process_Number': '2',
-                        'Material': 'Rod_Blk',
-                        'S/N': sn_list[0] if sn_list else 'N/A',
-                        'Material_Code': 'RDB5200200',
-                        'Inspection_Number': 'N/A',
-                        'Data_Type': 'N/A',
-                        'Inspection_Table': 'rd05200200_inspection'
-                    })
+                    all_columns.append(db_col)
+                    all_database_averages.append(db_avg)
+                    all_inspection_values.append(combined_value)
+                    all_deviations.append(deviation)
+                    all_materials.append('Rod_Blk')
+                    all_sns.append(sn_list[0] if sn_list else 'N/A')
                     
-                    print(f"  ✓ Deviation calculated: {db_col} -> {matched_col} = {deviation:.6f}")
+                    print(f"  Deviation calculated: {db_col} -> {matched_col} = {deviation:.6f}")
                 except Exception as e:
                     print(f"  Error calculating deviation for {db_col}: {e}")
     
-    if deviation_results:
-        deviation_df = pd.DataFrame(deviation_results)
-        print(f"\nCalculated {len(deviation_results)} deviations")
+    results_df = pd.DataFrame({
+        'Column': all_columns,
+        'Database Average': all_database_averages,
+        'Inspection Value': all_inspection_values,
+        'Deviation': all_deviations,
+        'Material': all_materials,
+        'S/N': all_sns
+    })
+    
+    # Add Date column from CSV if provided
+    if csv_date:
+        results_df['Date'] = csv_date
+    else:
+        results_df['Date'] = datetime.datetime.now().strftime('%Y/%m/%d')
+    
+    if not results_df.empty:
+        print("\nCalculated deviations")
         print("Sample deviation results:")
-        print(deviation_df.head())
-        return deviation_df
+        print(results_df.head())
+        return results_df
     else:
         print("No deviations calculated")
         return pd.DataFrame()
@@ -991,7 +1000,7 @@ def process_rod_blk_material_data():
     
     # Step 7: Calculate deviations
     print("\n7. Calculating deviations...")
-    deviation_df = calculate_rod_blk_deviations(database_df, combined_df, process_sn_list, sn_list)
+    deviation_df = calculate_rod_blk_deviations(database_df, combined_df, process_sn_list, sn_list, csv_date)
     
     # Step 8: Create Excel output
     print("\n8. Creating Excel output...")
@@ -1138,5 +1147,4 @@ if __name__ == "__main__":
 #         print(f"\nResult shape: {result.shape}")
 #     else:
 #         print("\nTest failed - no results returned")
-
 # # # %%

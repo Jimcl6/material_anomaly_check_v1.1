@@ -24,6 +24,7 @@ try:
     import csb_data_output
     import rod_blk_output
     import em_material
+    import df_blk_output
 except ImportError as e:
     print(f"Error importing material modules: {e}")
 
@@ -56,11 +57,15 @@ class MaterialAnomalyGUI:
         self.current_table_data = pd.DataFrame()
         self.selected_material = tk.StringVar(value="")
         
+        # Percentage display toggle
+        self.show_percentage = tk.BooleanVar(value=False)
+        
+        
         # Create comprehensive deviation log
         self.deviation_log_file = os.path.join(os.path.expanduser("~"), "Desktop", "comprehensive_deviation_log.xlsx")
         
         # CSV monitoring setup
-        self.csv_file_path = r"\\192.168.2.19\ai_team\AI Program\Outputs\PICompiled\PICompiled2025-07-11.csv"
+        self.csv_file_path = r"\\192.168.2.19\ai_team\AI Program\Outputs\PICompiled\PICompiled2025-04-30.csv"
         self.auto_monitoring = tk.BooleanVar(value=False)
         self.file_observer = None
         self.last_csv_hash = None
@@ -96,7 +101,7 @@ class MaterialAnomalyGUI:
         
         # Radio buttons for materials
         materials = [("All Critical Deviations", ""), ("Frame", "Frame"), 
-                    ("CSB", "CSB"), ("Rod Block", "Rod_Blk"), ("EM Material", "Em")]
+                    ("CSB", "CSB"), ("Rod Block", "Rod_Blk"), ("EM Material", "Em"), ("Df Block", "Df_Blk")]
         
         for i, (text, value) in enumerate(materials):
             rb = ttk.Radiobutton(material_frame, text=text, variable=self.selected_material, 
@@ -118,6 +123,16 @@ class MaterialAnomalyGUI:
         
         ttk.Button(button_frame, text="Save All Results", 
                   command=self.save_all_results).grid(row=2, column=0, pady=5, sticky=(tk.W, tk.E))
+        
+        # Display options
+        display_frame = ttk.LabelFrame(control_frame, text="Display Options", padding="10")
+        display_frame.grid(row=2, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
+        
+        self.percentage_checkbox = ttk.Checkbutton(display_frame, text="Show Deviations as Percentages", 
+                                                  variable=self.show_percentage, 
+                                                  command=self.toggle_percentage_display)
+        self.percentage_checkbox.grid(row=0, column=0, sticky=tk.W, pady=2)
+        
         
         # Auto-monitoring controls
         monitoring_frame = ttk.LabelFrame(control_frame, text="Auto Monitoring", padding="10")
@@ -142,7 +157,7 @@ class MaterialAnomalyGUI:
         self.progress_bar.grid(row=4, column=0, sticky=(tk.W, tk.E), pady=10)
         
         # Status label
-        self.status_label = ttk.Label(control_frame, text="Ready", foreground="green")
+        self.status_label = ttk.Label(control_frame, text="Ready", foreground="green", wraplength=200)
         self.status_label.grid(row=5, column=0, pady=5)
         
         # Right panel for results
@@ -151,7 +166,6 @@ class MaterialAnomalyGUI:
         results_frame.columnconfigure(0, weight=1)
         results_frame.rowconfigure(0, weight=1)
         
-        # Results table
         self.setup_results_table(results_frame)
         
         # Event logger at bottom
@@ -222,7 +236,7 @@ class MaterialAnomalyGUI:
         self.log_text.see(tk.END)
         
         # Update status label
-        self.status_label.config(text=message[:50] + "..." if len(message) > 50 else message)
+        self.status_label.config(text=message[:100] + "..." if len(message) > 100 else message)
         
         self.root.update_idletasks()
         
@@ -239,6 +253,8 @@ class MaterialAnomalyGUI:
                 result = rod_blk_output.process_material_data()
             elif script_name == "em_material":
                 result = em_material.process_material_data()
+            elif script_name == "df_blk_output":
+                result = df_blk_output.process_material_data()
             else:
                 raise ValueError(f"Unknown script: {script_name}")
             
@@ -266,7 +282,8 @@ class MaterialAnomalyGUI:
                     ("frame", "Frame"),
                     ("csb_data_output", "CSB"),
                     ("rod_blk_output", "Rod Block"),
-                    ("em_material", "EM Material")
+                    ("em_material", "EM Material"),
+                    ("df_blk_output", "Df Block")
                 ]
                 
                 self.all_deviation_data = {}
@@ -301,10 +318,19 @@ class MaterialAnomalyGUI:
     def log_to_comprehensive_file(self, deviation_df, material_name):
         """Log deviation data to comprehensive Excel file"""
         try:
-            # Add timestamp and material info
+            # Add timestamp, material info, and CSV date
             deviation_df_copy = deviation_df.copy()
             deviation_df_copy['Timestamp'] = datetime.datetime.now()
             deviation_df_copy['Material_Type'] = material_name
+            
+            # Add Date column from CSV data if available
+            if 'Date' in deviation_df_copy.columns:
+                # Date column already exists from material processing
+                pass
+            else:
+                # Extract date from CSV file if not already included
+                csv_date = self.get_csv_date()
+                deviation_df_copy['Date'] = csv_date
             
             # Check if file exists
             if os.path.exists(self.deviation_log_file):
@@ -320,6 +346,19 @@ class MaterialAnomalyGUI:
             
         except Exception as e:
             self.log_event(f"Error logging to comprehensive file: {str(e)}", "ERROR")
+    
+    def get_csv_date(self):
+        """Extract date from the current CSV file"""
+        try:
+            if hasattr(self, 'csv_file_path') and os.path.exists(self.csv_file_path):
+                # Read just the first row to get the date
+                csv_data = pd.read_csv(self.csv_file_path, nrows=1)
+                if 'DATE' in csv_data.columns and not csv_data.empty:
+                    return csv_data['DATE'].iloc[0]
+            return datetime.datetime.now().strftime('%Y/%m/%d')
+        except Exception as e:
+            self.log_event(f"Error extracting CSV date: {str(e)}", "ERROR")
+            return datetime.datetime.now().strftime('%Y/%m/%d')
     
     def update_table_display(self):
         """Update the table display based on selected material"""
@@ -363,14 +402,26 @@ class MaterialAnomalyGUI:
                 critical_deviations = deviation_df[critical_mask]
                 
                 for _, row in critical_deviations.iterrows():
+                    deviation_value = row.get('Deviation', 0)
+                    formatted_deviation = self.format_deviation_value(deviation_value)
                     critical_data.append({
                         'Column': row.get('Column', 'N/A'),
-                        'Deviation': f"{row.get('Deviation', 0):.4f}",
+                        'Deviation': formatted_deviation,
                         'Material': material_name
                     })
         
-        # Sort by absolute deviation value
-        critical_data.sort(key=lambda x: abs(float(x['Deviation'])), reverse=True)
+        # Sort by absolute deviation value (extract numeric value for sorting)
+        def get_numeric_deviation(item):
+            try:
+                dev_str = item['Deviation']
+                if '%' in dev_str:
+                    return abs(float(dev_str.replace('%', '')) / 100)
+                else:
+                    return abs(float(dev_str))
+            except (ValueError, TypeError):
+                return 0
+        
+        critical_data.sort(key=get_numeric_deviation, reverse=True)
         
         # Insert into tree
         for data in critical_data:
@@ -379,6 +430,34 @@ class MaterialAnomalyGUI:
         self.current_table_data = pd.DataFrame(critical_data)
         self.log_event(f"Displaying {len(critical_data)} critical deviations (>0.03 or <-0.03)")
     
+    
+    
+    
+    def toggle_percentage_display(self):
+        """Toggle between decimal and percentage display for deviations"""
+        self.update_table_display()
+        display_type = "percentages" if self.show_percentage.get() else "decimals"
+        self.log_event(f"Switched deviation display to {display_type}")
+    
+    def format_deviation_value(self, value):
+        """Format deviation value based on percentage toggle"""
+        try:
+            if isinstance(value, str):
+                # Try to extract numeric value from string
+                numeric_value = float(value)
+            else:
+                numeric_value = float(value)
+            
+            if self.show_percentage.get():
+                # Convert to percentage and format
+                percentage = numeric_value * 100
+                return f"{percentage:.2f}%"
+            else:
+                # Return as decimal with 4 decimal places
+                return f"{numeric_value:.4f}"
+        except (ValueError, TypeError):
+            return str(value)
+    
     def display_material_data(self, material_key):
         """Display all data for a specific material"""
         # Map radio button values to material names
@@ -386,7 +465,8 @@ class MaterialAnomalyGUI:
             "Frame": "Frame",
             "CSB": "CSB", 
             "Rod_Blk": "Rod Block",
-            "Em": "EM Material"
+            "Em": "EM Material",
+            "Df_Blk": "Df Block"
         }
         
         material_name = material_mapping.get(material_key, material_key)
@@ -418,17 +498,16 @@ class MaterialAnomalyGUI:
             else:
                 self.tree.column(col, width=120, anchor='w')  # 'w' = west (left align)
         
-        # Insert data
+        # Insert data into tree
         for _, row in deviation_df.iterrows():
             values = []
             for col in display_columns:
                 value = row.get(col, 'N/A')
                 if col == "Deviation" and isinstance(value, (int, float)):
-                    value = f"{value:.4f}"
+                    value = self.format_deviation_value(value)
                 elif col in ["Database Average", "Inspection Value"] and isinstance(value, (int, float)):
                     value = f"{value:.3f}"
                 values.append(str(value))
-            
             self.tree.insert("", tk.END, values=values)
         
         self.current_table_data = deviation_df[display_columns].copy()
@@ -626,7 +705,8 @@ class MaterialAnomalyGUI:
                     ("frame", "Frame"),
                     ("csb_data_output", "CSB"),
                     ("rod_blk_output", "Rod Block"),
-                    ("em_material", "EM Material")
+                    ("em_material", "EM Material"),
+                    ("df_blk_output", "Df Block")
                 ]
                 
                 auto_deviation_data = {}
