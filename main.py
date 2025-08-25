@@ -46,11 +46,15 @@ class CSVFileHandler(FileSystemEventHandler):
             threading.Timer(2.0, self.gui.process_csv_change).start()
 
 class MaterialAnomalyGUI:
+    
     def __init__(self, root):
         self.root = root
         self.root.title("Material Anomaly Detection System")
         self.root.geometry("1400x900")
         self.root.configure(bg='#f0f0f0')
+
+        # initialize datetime
+        self.x = datetime.datetime.now()
         
         # Initialize data storage
         self.all_deviation_data = {}  # Store deviation data for each material
@@ -65,7 +69,7 @@ class MaterialAnomalyGUI:
         self.deviation_log_file = os.path.join(os.path.expanduser("~"), "Desktop", "comprehensive_deviation_log.xlsx")
         
         # CSV monitoring setup
-        self.csv_file_path = r"\\192.168.2.19\ai_team\AI Program\Outputs\PICompiled\PICompiled2025-04-30.csv"
+        self.csv_file_path = fr"\\192.168.2.19\ai_team\AI Program\Outputs\PICompiled\PICompiled{self.x.year}-{self.x.strftime("%m")}-{self.x.strftime('%d')}.csv"
         self.auto_monitoring = tk.BooleanVar(value=False)
         self.file_observer = None
         self.last_csv_hash = None
