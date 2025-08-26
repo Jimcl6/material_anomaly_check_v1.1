@@ -88,6 +88,8 @@ def get_process2_data(process_sn, date):
     """
     Query process2_data table using PROCESS S/N and DATE to get Process_2_Df_Blk and Process_2_Df_Blk_Lot_No
     """
+    connection = None
+    cursor = None
     try:
         connection = mysql.connector.connect(**DB_CONFIG)
         cursor = connection.cursor(dictionary=True)
@@ -101,8 +103,19 @@ def get_process2_data(process_sn, date):
         cursor.execute(query, (process_sn, date))
         result = cursor.fetchone()
         
-        cursor.close()
-        connection.close()
+        # Consume any remaining results to avoid "Unread result found" error
+        try:
+            # First consume any remaining rows from current result set
+            cursor.fetchall()
+        except:
+            pass
+        
+        # Then consume any additional result sets
+        try:
+            while cursor.nextset():
+                cursor.fetchall()
+        except:
+            pass
         
         if result:
             print(f"Found Process_2_Df_Blk: {result['Process_2_Df_Blk']}, Process_2_Df_Blk_Lot_No: {result['Process_2_Df_Blk_Lot_No']}")
@@ -114,27 +127,41 @@ def get_process2_data(process_sn, date):
     except Exception as e:
         print(f"Error querying process2_data: {e}")
         return None, None
+    finally:
+        # Ensure proper cleanup
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
 
 def get_dfb_snap_data(df_blk_value, df_blk_lot_no):
     """
     Query dfb_snap_data table using Df_Blk lot info to get DF_RUBBER column
     """
+    connection = None
+    cursor = None
     try:
         connection = mysql.connector.connect(**DB_CONFIG)
         cursor = connection.cursor(dictionary=True)
         
-        # First, let's see what DATE values are available in dfb_snap_data
-        print(f"Looking for DATE match with Lot_No: {df_blk_lot_no}")
+        # First, let's see what ITEM_BLOCK_CODE and DATE values are available in dfb_snap_data
+        print(f"Looking for ITEM_BLOCK_CODE match with Df_Blk: {df_blk_value}")
+        print(f"Also checking DATE match with Lot_No: {df_blk_lot_no}")
+        cursor.execute("SELECT DISTINCT ITEM_BLOCK_CODE FROM dfb_snap_data ORDER BY ITEM_BLOCK_CODE LIMIT 20")
+        available_codes = cursor.fetchall()
+        print(f"Available ITEM_BLOCK_CODE values in dfb_snap_data: {[c['ITEM_BLOCK_CODE'] for c in available_codes]}")
+        
         cursor.execute("SELECT DISTINCT DATE FROM dfb_snap_data ORDER BY DATE DESC LIMIT 20")
         available_dates = cursor.fetchall()
         print(f"Available DATE values in dfb_snap_data: {[d['DATE'] for d in available_dates]}")
         
-        # Prioritize DATE matching over ITEM_BLOCK_CODE matching
+        # Prioritize combined ITEM_BLOCK_CODE and DATE matching for accuracy
         queries = [
-            ("SELECT DF_RUBBER, DATE FROM dfb_snap_data WHERE DATE = %s", (df_blk_lot_no,)),
-            ("SELECT DF_RUBBER, DATE FROM dfb_snap_data WHERE DATE LIKE %s", (f"%{df_blk_lot_no}%",)),
+            ("SELECT DF_RUBBER, DATE FROM dfb_snap_data WHERE ITEM_BLOCK_CODE = %s AND DATE = %s", (df_blk_value, df_blk_lot_no)),
             ("SELECT DF_RUBBER, DATE FROM dfb_snap_data WHERE ITEM_BLOCK_CODE = %s", (df_blk_value,)),
             ("SELECT DF_RUBBER, DATE FROM dfb_snap_data WHERE ITEM_BLOCK_CODE LIKE %s", (f"%{df_blk_value}%",)),
+            ("SELECT DF_RUBBER, DATE FROM dfb_snap_data WHERE DATE = %s", (df_blk_lot_no,)),
+            ("SELECT DF_RUBBER, DATE FROM dfb_snap_data WHERE DATE LIKE %s", (f"%{df_blk_lot_no}%",)),
             ("SELECT DF_RUBBER, DATE FROM dfb_snap_data ORDER BY DATE DESC LIMIT 1", ())
         ]
         
@@ -142,24 +169,38 @@ def get_dfb_snap_data(df_blk_value, df_blk_lot_no):
             print(f"Trying query {i+1}: {query} with params: {params}")
             cursor.execute(query, params)
             result = cursor.fetchone()
+            
             # Consume any remaining results to prevent "Unread result found" error
-            cursor.fetchall()
+            try:
+                # First consume any remaining rows from current result set
+                cursor.fetchall()
+            except:
+                pass
+            
+            # Then consume any additional result sets
+            try:
+                while cursor.nextset():
+                    cursor.fetchall()
+            except:
+                pass
             
             if result and result['DF_RUBBER']:
                 date_info = result.get('DATE', 'Unknown')
                 print(f"✅ Found DF_RUBBER: {result['DF_RUBBER']} (DATE: {date_info})")
-                cursor.close()
-                connection.close()
                 return result['DF_RUBBER']
         
-        cursor.close()
-        connection.close()
         print(f"❌ No DF_RUBBER found in dfb_snap_data for Df_Blk: {df_blk_value}, Lot_No: {df_blk_lot_no}")
         return None
         
     except Exception as e:
         print(f"Error querying dfb_snap_data: {e}")
         return None
+    finally:
+        # Ensure proper cleanup
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
 
 def clean_df_rubber_value(df_rubber):
     """
@@ -175,8 +216,10 @@ def clean_df_rubber_value(df_rubber):
 
 def get_dfb_tensile_data(cleaned_df_rubber):
     """
-    Query dfb_tensile_data table using cleaned DF_RUBBER value as DF_LOT_NO reference
+    Query dfb_tensile_data table using cleaned DF_RUBBER value as Lot_Number reference
     """
+    connection = None
+    cursor = None
     try:
         connection = mysql.connector.connect(**DB_CONFIG)
         cursor = connection.cursor(dictionary=True)
@@ -185,8 +228,9 @@ def get_dfb_tensile_data(cleaned_df_rubber):
         cursor.execute(query, (cleaned_df_rubber,))
         results = cursor.fetchall()
         
-        cursor.close()
-        connection.close()
+        # Consume any remaining results to avoid "Unread result found" error
+        while cursor.nextset():
+            pass
         
         if results:
             df = pd.DataFrame(results)
@@ -199,11 +243,19 @@ def get_dfb_tensile_data(cleaned_df_rubber):
     except Exception as e:
         print(f"Error querying dfb_tensile_data: {e}")
         return pd.DataFrame()
+    finally:
+        # Ensure proper cleanup
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
 
 def get_df06600600_inspection_data(cleaned_df_rubber):
     """
     Query df06600600_inspection table using cleaned DF_RUBBER value as Lot_Number reference
     """
+    connection = None
+    cursor = None
     try:
         connection = mysql.connector.connect(**DB_CONFIG)
         cursor = connection.cursor(dictionary=True)
@@ -212,8 +264,9 @@ def get_df06600600_inspection_data(cleaned_df_rubber):
         cursor.execute(query, (cleaned_df_rubber,))
         results = cursor.fetchall()
         
-        cursor.close()
-        connection.close()
+        # Consume any remaining results to avoid "Unread result found" error
+        while cursor.nextset():
+            pass
         
         if results:
             df = pd.DataFrame(results)
@@ -226,6 +279,12 @@ def get_df06600600_inspection_data(cleaned_df_rubber):
     except Exception as e:
         print(f"Error querying df06600600_inspection: {e}")
         return pd.DataFrame()
+    finally:
+        # Ensure proper cleanup
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
 
 def combine_inspection_data(dfb_tensile_df, df06600600_inspection_df):
     """
@@ -261,17 +320,48 @@ def combine_inspection_data(dfb_tensile_df, df06600600_inspection_df):
         print(f"Error combining inspection data: {e}")
         return pd.DataFrame()
 
-def get_database_data_for_df_blk():
+def get_database_data_for_df_blk(model_code):
     """
-    Query database_data table for Df_Blk related columns and calculate averages
+    Query database_data table for Df_Blk related columns and calculate averages.
+    Applies keyword filtering before PASS_NG filter to ensure clean data.
+    
+    Args:
+        model_code: The model code to filter by (e.g., '60CAT0212P')
     """
     try:
         connection = mysql.connector.connect(**DB_CONFIG)
         cursor = connection.cursor(dictionary=True)
         
-        # Get all columns from database_data table (fix: remove ORDER BY id)
-        query = "SELECT * FROM database_data LIMIT 100"
-        cursor.execute(query)
+        # Keywords to filter out before applying PASS_NG filter
+        keywords_to_filter = ['NG', 'TRIAL', 'MASTER PUMP', 'RUNNING', 'RE PI', 'REPAIRED', 'REPAIRED AT']
+        
+        # Build keyword filtering conditions for NG_Cause columns
+        ng_cause_columns = [
+            'Process_1_NG_Cause', 'Process_2_NG_Cause', 'Process_3_NG_Cause',
+            'Process_4_NG_Cause', 'Process_5_NG_Cause', 'Process_6_NG_Cause'
+        ]
+        
+        # Create WHERE conditions to exclude records with problematic keywords
+        keyword_conditions = []
+        for keyword in keywords_to_filter:
+            for column in ng_cause_columns:
+                keyword_conditions.append(f"{column} NOT LIKE '%{keyword}%'")
+        
+        keyword_filter = " AND ".join(keyword_conditions)
+        
+        # Query with keyword filtering and MODEL_CODE filter, then order by DATE DESC
+        query = f"""
+        SELECT *
+        FROM database_data
+        WHERE ({keyword_filter})
+        AND Model_Code = %s
+        ORDER BY DATE DESC
+        LIMIT 100
+        """
+        
+        print(f"Executing query with keyword filtering for: {keywords_to_filter}")
+        print(f"Filtering by MODEL_CODE: {model_code}")
+        cursor.execute(query, (model_code,))
         results = cursor.fetchall()
         
         cursor.close()
@@ -279,24 +369,104 @@ def get_database_data_for_df_blk():
         
         if results:
             df = pd.DataFrame(results)
-            print(f"Retrieved {len(df)} rows from database_data table.")
+            print(f"Retrieved {len(df)} clean rows from database_data table after keyword filtering.")
+            
+            # Additional DataFrame-level filtering for any remaining problematic data
+            print("Applying additional DataFrame-level keyword filtering...")
+            df_cleaned = clean_database_data_df(df, keywords_to_filter)
             
             # Filter for Df_Blk related columns
-            df_blk_columns = [col for col in df.columns if 'Df_Blk' in col or 'df_blk' in col.lower()]
+            df_blk_columns = [col for col in df_cleaned.columns if 'Df_Blk' in col or 'df_blk' in col.lower()]
             
             if df_blk_columns:
                 print(f"Found Df_Blk related columns: {df_blk_columns}")
-                return df
+                return df_cleaned
             else:
                 print("No Df_Blk related columns found in database_data.")
-                return df  # Return all data for comprehensive analysis
+                return df_cleaned  # Return all clean data for comprehensive analysis
         else:
-            print("No data found in database_data table.")
+            print("No data found in database_data table after filtering.")
             return pd.DataFrame()
             
     except Exception as e:
         print(f"Error querying database_data: {e}")
         return pd.DataFrame()
+
+def clean_database_data_df(df, keywords_to_filter):
+    """
+    Clean DataFrame by filtering out rows and columns containing specified keywords.
+    Preserves critical columns like PASS_NG regardless of keyword matches.
+    
+    Args:
+        df: DataFrame with database data
+        keywords_to_filter: List of keywords to filter out
+        
+    Returns:
+        Cleaned DataFrame
+    """
+    if df is None or df.empty:
+        return df
+    
+    print(f"Cleaning database DataFrame with {len(df)} rows and {len(df.columns)} columns")
+    print(f"Filtering out rows and columns containing: {keywords_to_filter}")
+    
+    # Define critical columns that should always be preserved
+    critical_columns = ['PASS_NG', 'DATE', 'Model_Code', 'Process_SN', 'SN']
+    
+    # Filter out rows that contain any of the keywords in NG_Cause columns only
+    ng_cause_columns = [col for col in df.columns if 'NG_Cause' in col]
+    rows_to_keep = pd.Series([True] * len(df))
+    
+    for keyword in keywords_to_filter:
+        for col in ng_cause_columns:  # Only check NG_Cause columns for row filtering
+            if col in df.columns and df[col].dtype == 'object':
+                rows_to_keep = rows_to_keep & (~df[col].astype(str).str.contains(keyword, case=False, na=False))
+    
+    df_filtered = df[rows_to_keep]
+    print(f"Filtered rows from {len(df)} to {len(df_filtered)}")
+    
+    # Filter out columns that contain keywords, but preserve critical columns
+    columns_to_keep = []
+    for col in df_filtered.columns:
+        # Always keep critical columns
+        if col in critical_columns:
+            columns_to_keep.append(col)
+            print(f"  Preserving critical column '{col}'")
+            continue
+            
+        # Check if column name contains any of the keywords
+        keep_column = True
+        for keyword in keywords_to_filter:
+            if keyword in str(col):
+                keep_column = False
+                print(f"  Removing column '{col}' because name contains keyword '{keyword}'")
+                break
+        
+        # If column name is okay, check if any values in the column contain keywords
+        # But only for NG_Cause columns to avoid over-filtering
+        if keep_column and 'NG_Cause' in col:
+            if df_filtered[col].dtype == 'object':  # Only check string columns
+                # Check if any value in the column contains any of the keywords
+                for keyword in keywords_to_filter:
+                    if df_filtered[col].astype(str).str.contains(keyword, case=False, na=False).any():
+                        keep_column = False
+                        print(f"  Removing column '{col}' because values contain keyword '{keyword}'")
+                        break
+        
+        if keep_column:
+            columns_to_keep.append(col)
+    
+    df_filtered = df_filtered[columns_to_keep]
+    print(f"Filtered columns from {len(df.columns)} to {len(df_filtered.columns)}")
+    
+    # Verify PASS_NG column is present
+    if 'PASS_NG' in df_filtered.columns:
+        print("✓ PASS_NG column preserved in cleaned DataFrame")
+    else:
+        print("⚠ WARNING: PASS_NG column missing from cleaned DataFrame")
+    
+    print(f"Final cleaned data has {len(df_filtered)} rows and {len(df_filtered.columns)} columns")
+    return df_filtered
 
 def calculate_df_blk_deviations(database_df, combined_df, process_sn_list=None, sn_list=None):
     """
@@ -393,11 +563,11 @@ def calculate_df_blk_deviations(database_df, combined_df, process_sn_list=None, 
                                 'Material_Code': 'Df_Blk',
                                 'S/N': sn_list[0] if sn_list else 'N/A',
                                 'Column': database_col,
-                                'Database_Average': database_averages[database_col],
-                                'Inspection_Value': row[inspection_col],
+                                'Database Average': database_averages[database_col],
+                                'Inspection Value': row[inspection_col],
                                 'Deviation': deviation,
                                 'Data_Source': row.get('data_source', 'Unknown'),
-                                'Matched_Inspection_Column': inspection_col
+                                'Matched Inspection Column': inspection_col
                             })
                             print(f"✅ Calculated deviation for {inspection_col} -> {database_col}: {deviation:.4f}")
         
@@ -460,11 +630,11 @@ def calculate_df_blk_deviations_from_database_only(database_df, process_sn_list=
                         'Material_Code': 'Df_Blk',
                         'S/N': sn_list[0] if sn_list else 'N/A',
                         'Column': col,
-                        'Database_Average': historical_avg,
-                        'Inspection_Value': current_value,
+                        'Database Average': historical_avg,
+                        'Inspection Value': current_value,
                         'Deviation': deviation,
                         'Data_Source': 'database_data',
-                        'Matched_Inspection_Column': col
+                        'Matched Inspection Column': col
                     })
             except Exception as e:
                 print(f"Error processing column {col}: {e}")
@@ -596,7 +766,7 @@ def process_material_data():
         
         # Step 8: Query database_data table
         print("\n8. Querying database_data table...")
-        database_df = get_database_data_for_df_blk()
+        database_df = get_database_data_for_df_blk(model_code)
         print(f"DEBUG: Database data rows: {len(database_df)}")
         
         # Step 9: Calculate deviations

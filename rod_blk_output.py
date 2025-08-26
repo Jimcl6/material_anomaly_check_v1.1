@@ -502,19 +502,18 @@ def get_database_data_for_model(model_code, limit=100):
         
         keyword_filter = " AND ".join(keyword_conditions)
         
-        # Query for data with the specific model code, filtering by PASS_NG = "1" and excluding problematic keywords
-        # Order by date descending to get the most recent clean passing records
+        # Query for data with the specific model code, excluding problematic keywords (keep all PASS_NG values)
+        # Order by date descending to get the most recent clean records
         query = f"""
         SELECT *
         FROM database_data
         WHERE Model_Code = %s
-        AND PASS_NG = '1'
         AND ({keyword_filter})
         ORDER BY DATE DESC
         LIMIT {limit}
         """
         
-        print(f"Executing query for {limit} records (PASS_NG = '1', excluding problematic keywords)")
+        print(f"Executing query for {limit} records (excluding problematic keywords, keeping all PASS_NG values)")
         print(f"Filtering out keywords: {problematic_keywords}")
         cursor.execute(query, (model_code,))
         results = cursor.fetchall()
@@ -532,7 +531,7 @@ def get_database_data_for_model(model_code, limit=100):
                     print(f"Historical data date range: {dates.min()} to {dates.max()}")
                     print(f"Sample dates: {dates.head(3).tolist()}")
             
-            # Show PASS_NG distribution to confirm filtering
+            # Show PASS_NG distribution (now includes all values)
             if 'PASS_NG' in df.columns:
                 pass_ng_counts = df['PASS_NG'].value_counts()
                 print(f"PASS_NG distribution: {pass_ng_counts.to_dict()}")
@@ -724,7 +723,7 @@ def calculate_rod_blk_deviations(database_df, combined_df, process_sn_list=None,
                     # Calculate deviation
                     deviation = (db_avg - combined_value) / db_avg
                     
-                    all_columns.append(db_col)
+                    all_columns.append(matched_col)  # Use the matched inspection column name instead of database column name
                     all_database_averages.append(db_avg)
                     all_inspection_values.append(combined_value)
                     all_deviations.append(deviation)
@@ -736,7 +735,7 @@ def calculate_rod_blk_deviations(database_df, combined_df, process_sn_list=None,
                     print(f"  Error calculating deviation for {db_col}: {e}")
     
     results_df = pd.DataFrame({
-        'Column': all_columns,
+        'Matched Inspection Column': all_columns,
         'Database Average': all_database_averages,
         'Inspection Value': all_inspection_values,
         'Deviation': all_deviations,
@@ -800,15 +799,44 @@ def get_inspection_data_by_date_fallback(csv_date):
             
     except Exception as e:
         print(f"Error in date fallback: {e}")
-        if connection:
-            connection.close()
         return pd.DataFrame()
+
+
+def map_database_to_inspection_column(database_col):
+    """
+    Map database column names to their corresponding inspection table column names.
+    This helps show what inspection columns the database columns correspond to.
+    """
+    # Remove Process_2_Rod_Blk_ prefix and _Data suffix to get the base pattern
+    base_pattern = database_col.replace('Process_2_Rod_Blk_', '').replace('_Data', '')
+    
+    # Common mapping patterns for Rod Block inspection columns
+    mapping_patterns = {
+        # Inspection types based on common Rod Block measurements
+        'Inspection_3_Maximum': 'Inspection_3_Resistance_Maximum',
+        'Inspection_3_Minimum': 'Inspection_3_Resistance_Minimum', 
+        'Inspection_3_Average': 'Inspection_3_Resistance_Average',
+        'Inspection_4_Maximum': 'Inspection_4_Dimension_Maximum',
+        'Inspection_4_Minimum': 'Inspection_4_Dimension_Minimum',
+        'Inspection_4_Average': 'Inspection_4_Dimension_Average',
+        'Inspection_5_Maximum': 'Inspection_5_Dimension_Maximum',
+        'Inspection_5_Minimum': 'Inspection_5_Dimension_Minimum',
+        'Inspection_5_Average': 'Inspection_5_Dimension_Average',
+        'Inspection_10': 'Inspection_10_Pull_Test'
+    }
+    
+    # Check if we have a direct mapping
+    if base_pattern in mapping_patterns:
+        return mapping_patterns[base_pattern]
+    
+    # If no direct mapping, return the base pattern (cleaned up database column name)
+    return base_pattern
 
 
 def create_database_only_deviations(database_df, process_sn_list, sn_list):
     """
-    Create deviation data using only database averages when no inspection data is available.
-    This provides at least some Rod_Blk analysis results.
+    Create deviation calculations using only database data when inspection data is not available.
+    This is a fallback approach for Rod_Blk material.
     """
     print("\n=== CREATING DATABASE-ONLY DEVIATIONS ===")
     
@@ -835,11 +863,13 @@ def create_database_only_deviations(database_df, process_sn_list, sn_list):
                 # Create a "deviation" based on standard deviation (indicating variability)
                 deviation = std_value / avg_value if avg_value != 0 else 0
                 
+                # Map database column name to inspection table column name
+                inspection_col_name = map_database_to_inspection_column(col)
+                
                 deviation_results.append({
-                    'Column': col,
-                    'Database_Average': avg_value,
-                    'Inspection_Value': avg_value,  # Use average as inspection value
-                    'Matched_Inspection_Column': 'Database_Average',
+                    'Matched Inspection Column': inspection_col_name,
+                    'Database Average': avg_value,
+                    'Inspection Value': avg_value,  # Use average as inspection value
                     'Deviation': deviation,
                     'Material': 'Rod_Blk',
                     'S/N': sn_list[0] if sn_list else 'N/A',

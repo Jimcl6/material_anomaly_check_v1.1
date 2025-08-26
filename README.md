@@ -2,7 +2,7 @@
 
 ## Overview
 
-This system correlates CSV file data with database material information to perform material anomaly checks. It extracts specific material codes (Em2p, Em3p, Frame, Casing_Block, Df_Blk, Rod_Blk) from database process tables and relates them to the latest CSV entry using MODEL CODE and PROCESS S/N.
+This system correlates CSV file data with database material information to perform material anomaly checks and deviation calculations. It extracts specific material codes (Em2p, Em3p, Frame, Casing_Block, Df_Blk, Rod_Blk) from database process tables, relates them to the latest CSV entry using MODEL CODE and PROCESS S/N, and calculates deviations between inspection data and database averages.
 
 ## Problem Solved
 
@@ -90,9 +90,14 @@ all_materials = get_process_dataframes(DB_CONFIG, specific_materials=[])
 
 ```
 jed_material_anomaly_check/
-├── main.py                     # Main implementation
-├── test_correlation.py         # Correlation testing with sample data
-├── test_specific_materials.py  # Material extraction testing
+├── main.py                     # Main GUI implementation
+├── frame.py                    # Frame material processing
+├── em_material.py              # Em2p/Em3p material processing  
+├── csb_data_output.py          # Casing Block material processing
+├── df_blk_output.py            # Df Block material processing
+├── rod_blk_output.py           # Rod Block material processing
+├── tkinter_dashboard.py        # GUI dashboard interface
+├── test_*.py                   # Various testing scripts
 ├── explore_database_schema.py  # Database exploration utility
 ├── database_exploration_plan.md # Planning document
 └── README.md                   # This documentation
@@ -150,8 +155,8 @@ DB_CONFIG = {
 
 ### CSV File Configuration
 ```python
-NETWORK_DIR = r"D:\AI_Team\AI Program\Outputs\PICompiled"
-FILENAME = "PICompiled2025-04-30.csv"
+NETWORK_DIR = r"\\192.168.2.19\ai_team\AI Program\Outputs\PICompiled"
+FILENAME = "PICompiled2025-08-20.csv"
 ```
 
 ## Error Handling
@@ -169,6 +174,51 @@ The system handles:
 - **Material Extraction**: Dynamic detection with regex patterns
 - **Memory Efficient**: Only loads required materials by default
 - **Scalable**: Supports additional processes and materials
+
+## Recent Updates (August 2025)
+
+### 1. Database Connection Fixes
+- **Fixed "Unread result found" errors** in `df_blk_output.py`
+- **Enhanced cursor management** with proper result consumption
+- **Added robust error handling** for MySQL connections
+
+### 2. Keyword Filtering Alignment
+- **Standardized filtering** across all material files
+- **Added keywords**: 'REPAIRED', 'REPAIRED AT' 
+- **Consistent row counts**: All files now return 94 rows (previously inconsistent 66 vs 94)
+- **Files updated**: `frame.py`, `em_material.py`, `csb_data_output.py`
+
+### 3. CSV File Updates
+- **Updated to**: `PICompiled2025-08-20.csv`
+- **Applied across**: All material processing files
+- **Consistent data source** for all analyses
+
+### 4. Query Logic Improvements
+- **Fixed dfb_snap_data queries** to prioritize ITEM_BLOCK_CODE matching
+- **Enhanced MODEL_CODE filtering** in database_data queries
+- **Improved data correlation** between process2_data and dfb_snap_data tables
+
+### 5. Material Processing Enhancements
+- **Individual material files** for specialized processing
+- **Excel output generation** with material-specific sheets
+- **Deviation calculations** between inspection data and database averages
+- **GUI integration** through tkinter dashboard
+
+## System Architecture
+
+### Material Processing Files
+- **`frame.py`**: Frame material deviation analysis
+- **`em_material.py`**: Em2p/Em3p material processing
+- **`csb_data_output.py`**: Casing Block material analysis  
+- **`df_blk_output.py`**: Df Block material processing
+- **`rod_blk_output.py`**: Rod Block material analysis
+
+### Key Features
+- **Automated deviation calculations**
+- **Excel report generation**
+- **Database correlation with inspection data**
+- **Keyword-based data filtering**
+- **GUI dashboard interface**
 
 ## Future Enhancements
 

@@ -11,8 +11,8 @@ x = datetime.datetime.now()
 pd.set_option('display.max_columns', None)  # Show all columns in DataFrame output
 
 NETWORK_DIR = r"\\192.168.2.19\ai_team\AI Program\Outputs\PICompiled"
-FILENAME = f"PICompiled{x.year}-{x.strftime("%m")}-{x.strftime('%d')}.csv"
-# FILENAME = f"PICompiled2025-08-20.csv"
+# FILENAME = f"PICompiled{x.year}-{x.strftime("%m")}-{x.strftime('%d')}.csv"
+FILENAME = f"PICompiled2025-08-20.csv"
 FILEPATH = os.path.join(NETWORK_DIR, FILENAME)
 DB_CONFIG = {
     'host': '192.168.2.148',
@@ -599,11 +599,30 @@ def get_database_data_for_model(model_code, limit=100):
         # Use * to select all columns
         columns_str = '*'
         
-        # Query for data with the specific model code
+        # Keywords to filter out before querying
+        keywords_to_filter = ['NG', 'TRIAL', 'MASTER PUMP', 'RUNNING', 'RE PI', 'REPAIRED', 'REPAIRED AT']
+        
+        # Build keyword filtering conditions for NG_Cause columns
+        ng_cause_columns = [
+            'Process_1_NG_Cause', 'Process_2_NG_Cause', 'Process_3_NG_Cause',
+            'Process_4_NG_Cause', 'Process_5_NG_Cause', 'Process_6_NG_Cause'
+        ]
+        
+        # Create WHERE conditions to exclude records with problematic keywords
+        keyword_conditions = []
+        for keyword in keywords_to_filter:
+            for column in ng_cause_columns:
+                keyword_conditions.append(f"{column} NOT LIKE '%{keyword}%'")
+        
+        keyword_filter = " AND ".join(keyword_conditions)
+        
+        # Query for data with the specific model code and keyword filtering (keep all PASS_NG values)
+        # Order by DATE DESC to get the most recent records consistently
         query = f"""
         SELECT {columns_str}
         FROM database_data
-        WHERE Model_Code = %s
+        WHERE Model_Code = %s AND ({keyword_filter})
+        ORDER BY DATE DESC
         LIMIT {limit}
         """
         
@@ -1362,7 +1381,7 @@ def perform_deviation_calculations(database_df, inspection_df, process_sn_list=N
                 if matched_inspection_value is not None:
                     # Apply deviation formula: (Average of 100 historical database_data rows - Current material inspection data) / Average of 100 historical database_data rows
                     deviation = (db_avg - matched_inspection_value) / db_avg
-                    deviation = round(deviation, 4)  # Round to 6 decimal places
+                    deviation = round(deviation, 6)  # Round to 6 decimal places
                     
                     # Add row to results with detailed information
                     results_data.append({
@@ -1375,7 +1394,7 @@ def perform_deviation_calculations(database_df, inspection_df, process_sn_list=N
                         'Material_Code': material_code,
                         'Inspection_Number': inspection_num,
                         'Data_Type': data_type,
-                        'Matched_Inspection_Column': matched_column_name,
+                        'Matched Inspection Column': matched_column_name,
                         'Matching_Strategy': matching_strategy,
                         'Inspection_Table': material_patterns[material]['inspection_table'] if material in material_patterns else ''
                     })
@@ -1420,10 +1439,10 @@ def perform_deviation_calculations(database_df, inspection_df, process_sn_list=N
         sample_size = min(10, len(results_df))
         for i in range(sample_size):
             row = results_df.iloc[i]
-            if 'Matched_Inspection_Column' in row:
-                print(f"  {i+1}. {row['Column']} -> {row['Matched_Inspection_Column']} (deviation: {row['Deviation']:.6f})")
+            if 'Matched Inspection Column' in row:
+                print(f"  {i+1}. {row['Matched Inspection Column']} (deviation: {row['Deviation']:.6f})")
             else:
-                print(f"  {i+1}. {row['Column']} (deviation: {row['Deviation']:.6f})")
+                print(f"  {i+1}. Unknown column (deviation: {row['Deviation']:.6f})")
         
         if len(results_df) > 10:
             print(f"  ... and {len(results_df) - 10} more correlations")

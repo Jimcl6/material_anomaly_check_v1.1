@@ -597,19 +597,37 @@ def get_database_data_for_model(model_code, limit=100):
         
         print(f"\n=== QUERYING DATABASE_DATA TABLE FOR MODEL {model_code} ===")
         
-        # Adaptive approach: Start with a higher multiplier and adjust if needed
-        # Try to get at least the target number of records after cleaning
-        query_limit = max(int(limit * 2), 500)  # Use at least 500 or 2x limit, whichever is higher
+        # Use the exact limit requested for consistency with other scripts
+        query_limit = limit
         
-        # Query for all columns with the specific model code
-        query = """
+        # Keywords to filter out before querying
+        keywords_to_filter = ['NG', 'TRIAL', 'MASTER PUMP', 'RUNNING', 'RE PI', 'REPAIRED', 'REPAIRED AT']
+        
+        # Build keyword filtering conditions for NG_Cause columns
+        ng_cause_columns = [
+            'Process_1_NG_Cause', 'Process_2_NG_Cause', 'Process_3_NG_Cause',
+            'Process_4_NG_Cause', 'Process_5_NG_Cause', 'Process_6_NG_Cause'
+        ]
+        
+        # Create WHERE conditions to exclude records with problematic keywords
+        keyword_conditions = []
+        for keyword in keywords_to_filter:
+            for column in ng_cause_columns:
+                keyword_conditions.append(f"{column} NOT LIKE '%{keyword}%'")
+        
+        keyword_filter = " AND ".join(keyword_conditions)
+        
+        # Query for all columns with the specific model code and keyword filtering (keep all PASS_NG values)
+        # Order by DATE DESC to get the most recent records consistently
+        query = f"""
         SELECT *
         FROM database_data
-        WHERE Model_Code = %s
+        WHERE Model_Code = %s AND ({keyword_filter})
+        ORDER BY DATE DESC
         LIMIT %s
         """
         
-        print(f"Executing query to retrieve all columns for model {model_code} (query limit: {query_limit}, target after cleaning: {limit})")
+        print(f"Executing query to retrieve all columns for model {model_code} (limit: {query_limit})")
         cursor.execute(query, (model_code, query_limit))
         results = cursor.fetchall()
         
@@ -671,6 +689,7 @@ def clean_database_data(df):
     keywords = [
         "NG PRESSURE",
         "REPAIRED AT",
+        "REPAIRED",
         "RE PI",
         "MASTER PUMP",
         "NG AT",
@@ -1173,7 +1192,7 @@ def perform_deviation_calculations(database_df, inspection_df, process_sn_list=N
                     
                     # Add row to results with detailed information
                     results_data.append({
-                        'Column': db_col,
+                        'Matched Inspection Column': matched_column_name,
                         'Database Average': db_avg,
                         'Inspection Value': matched_inspection_value,
                         'Deviation': deviation,
@@ -1182,7 +1201,6 @@ def perform_deviation_calculations(database_df, inspection_df, process_sn_list=N
                         'Material_Code': material_code,
                         'Inspection_Number': inspection_num,
                         'Data_Type': data_type,
-                        'Matched_Inspection_Column': matched_column_name,
                         'Matching_Strategy': matching_strategy,
                         'Inspection_Table': material_patterns[material]['inspection_table'] if material in material_patterns else '',
                         'Absolute_Deviation': abs(deviation)
@@ -1228,10 +1246,10 @@ def perform_deviation_calculations(database_df, inspection_df, process_sn_list=N
         sample_size = min(10, len(results_df))
         for i in range(sample_size):
             row = results_df.iloc[i]
-            if 'Matched_Inspection_Column' in row:
-                print(f"  {i+1}. {row['Column']} -> {row['Matched_Inspection_Column']} (deviation: {row['Deviation']:.6f})")
+            if 'Matched Inspection Column' in row:
+                print(f"  {i+1}. {row['Matched Inspection Column']} (deviation: {row['Deviation']:.6f})")
             else:
-                print(f"  {i+1}. {row['Column']} (deviation: {row['Deviation']:.6f})")
+                print(f"  {i+1}. Unknown column (deviation: {row['Deviation']:.6f})")
         
         if len(results_df) > 10:
             print(f"  ... and {len(results_df) - 10} more correlations")
@@ -1646,7 +1664,7 @@ def create_material_sheet_data(deviation_df, material_code, inspection_df):
     
     return pd.DataFrame(material_sheet_data)
 
-def create_excel_output(process_df, inspection_df, database_df, deviation_df, filename="em_data_output.xlsx"):
+def create_excel_output(process_df, inspection_df, database_df, deviation_df, filename="csb_data_output.xlsx"):
     """
     Create an Excel file with material-based sheets, inspection data, and database data.
     
@@ -1805,14 +1823,14 @@ if __name__ == "__main__":
             inspection_df=result.get('inspection_dataframe'),
             database_df=result.get('database_data'),
             deviation_df=result.get('deviation_data'),
-            filename="em_data_output.xlsx"
+            filename="csb_data_output.xlsx"
         )
         
         # Additional confirmation
         
-        if os.path.exists("em_data_output.xlsx"):
-            file_size = os.path.getsize("em_data_output.xlsx")
-            print(f"[OK] Excel file created successfully: em_data_output.xlsx ({file_size} bytes)")
+        if os.path.exists("csb_data_output.xlsx"):
+            file_size = os.path.getsize("csb_data_output.xlsx")
+            print(f"[OK] Excel file created successfully: csb_data_output.xlsx ({file_size} bytes)")
         else:
             print("[X] Excel file was not created")
 

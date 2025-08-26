@@ -264,6 +264,9 @@ class MaterialAnomalyGUI:
             
             if result and 'deviation_data' in result and result['deviation_data'] is not None:
                 deviation_df = result['deviation_data']
+                # Debug: Log columns for Rod Block processing
+                if material_name == "Rod Block":
+                    self.log_event(f"Rod Block processing result columns: {list(deviation_df.columns)}", "DEBUG")
                 self.log_event(f"{material_name} analysis completed. Found {len(deviation_df)} deviation records.")
                 return deviation_df
             else:
@@ -386,7 +389,7 @@ class MaterialAnomalyGUI:
     def display_critical_deviations(self):
         """Display only critical deviations from all materials"""
         # Configure columns for critical view
-        columns = ("Column", "Deviation", "Material")
+        columns = ("Matched Inspection Column", "Deviation", "Material")
         self.tree["columns"] = columns
         
         for col in columns:
@@ -394,6 +397,8 @@ class MaterialAnomalyGUI:
             # Right align specific columns
             if col in ["Deviation", "Material", "S/N"]:
                 self.tree.column(col, width=150, anchor='e')  # 'e' = east (right align)
+            elif col == "Matched Inspection Column":
+                self.tree.column(col, width=200, anchor='w')  # Wider column for inspection column names
             else:
                 self.tree.column(col, width=150, anchor='w')  # 'w' = west (left align)
         
@@ -408,8 +413,10 @@ class MaterialAnomalyGUI:
                 for _, row in critical_deviations.iterrows():
                     deviation_value = row.get('Deviation', 0)
                     formatted_deviation = self.format_deviation_value(deviation_value)
+                    # Try to get the matched inspection column, fallback to Column if not available
+                    matched_column = row.get('Matched Inspection Column', row.get('Column', 'N/A'))
                     critical_data.append({
-                        'Column': row.get('Column', 'N/A'),
+                        'Matched Inspection Column': matched_column,
                         'Deviation': formatted_deviation,
                         'Material': material_name
                     })
@@ -429,7 +436,7 @@ class MaterialAnomalyGUI:
         
         # Insert into tree
         for data in critical_data:
-            self.tree.insert("", tk.END, values=(data['Column'], data['Deviation'], data['Material']))
+            self.tree.insert("", tk.END, values=(data['Matched Inspection Column'], data['Deviation'], data['Material']))
         
         self.current_table_data = pd.DataFrame(critical_data)
         self.log_event(f"Displaying {len(critical_data)} critical deviations (>0.03 or <-0.03)")
@@ -487,10 +494,20 @@ class MaterialAnomalyGUI:
         
         # Configure columns for detailed view
         available_columns = list(deviation_df.columns)
-        desired_columns = ["Column", "Database Average", "Inspection Value", "Deviation", "Material", "S/N", "Matched Inspection Column"]
+        
+        # Debug: Log available columns for Rod Block
+        if material_name == "Rod Block":
+            self.log_event(f"Rod Block available columns: {available_columns}", "DEBUG")
+        
+        # Use Matched Inspection Column instead of Column for all materials
+        desired_columns = ["Matched Inspection Column", "Database Average", "Inspection Value", "Deviation", "Material", "S/N"]
         
         # Use available columns that match desired columns
         display_columns = [col for col in desired_columns if col in available_columns]
+        
+        # Debug: Log display columns for Rod Block
+        if material_name == "Rod Block":
+            self.log_event(f"Rod Block display columns: {display_columns}", "DEBUG")
         
         self.tree["columns"] = display_columns
         
@@ -499,6 +516,8 @@ class MaterialAnomalyGUI:
             # Right align specific columns for better readability
             if col in ["Deviation", "Material", "S/N", "Database Average", "Inspection Value"]:
                 self.tree.column(col, width=120, anchor='e')  # 'e' = east (right align)
+            elif col == "Matched Inspection Column":
+                self.tree.column(col, width=200, anchor='w')  # Wider column for inspection column names
             else:
                 self.tree.column(col, width=120, anchor='w')  # 'w' = west (left align)
         
@@ -511,6 +530,9 @@ class MaterialAnomalyGUI:
                     value = self.format_deviation_value(value)
                 elif col in ["Database Average", "Inspection Value"] and isinstance(value, (int, float)):
                     value = f"{value:.3f}"
+                elif col == "Matched Inspection Column":
+                    # Display the matched inspection column value
+                    value = str(value) if value != 'N/A' else 'N/A'
                 values.append(str(value))
             self.tree.insert("", tk.END, values=values)
         
