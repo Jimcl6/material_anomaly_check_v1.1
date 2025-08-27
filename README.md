@@ -90,17 +90,17 @@ all_materials = get_process_dataframes(DB_CONFIG, specific_materials=[])
 
 ```
 jed_material_anomaly_check/
-├── main.py                     # Main GUI implementation
-├── frame.py                    # Frame material processing
-├── em_material.py              # Em2p/Em3p material processing  
-├── csb_data_output.py          # Casing Block material processing
-├── df_blk_output.py            # Df Block material processing
-├── rod_blk_output.py           # Rod Block material processing
-├── tkinter_dashboard.py        # GUI dashboard interface
-├── test_*.py                   # Various testing scripts
-├── explore_database_schema.py  # Database exploration utility
+├── main.py                      # Main GUI implementation
+├── frame.py                     # Frame material processing
+├── em_material.py               # Em2p/Em3p material processing  
+├── csb_data_output.py           # Casing Block material processing
+├── df_blk_output.py             # Df Block material processing
+├── rod_blk_output.py            # Rod Block material processing
+├── tkinter_dashboard.py         # GUI dashboard interface
+├── test_*.py                    # Various testing scripts
+├── explore_database_schema.py   # Database exploration utility
 ├── database_exploration_plan.md # Planning document
-└── README.md                   # This documentation
+└── README.md                    # This documentation
 ```
 
 ## Key Functions
@@ -156,7 +156,8 @@ DB_CONFIG = {
 ### CSV File Configuration
 ```python
 NETWORK_DIR = r"\\192.168.2.19\ai_team\AI Program\Outputs\PICompiled"
-FILENAME = "PICompiled2025-08-20.csv"
+FILENAME = f"PICompiled{x.year}-{x.strftime("%m")}-{x.strftime('%d')}.csv
+# FILENAME = "PICompiled2025-08-20.csv"
 ```
 
 ## Error Handling

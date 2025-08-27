@@ -22,9 +22,51 @@ DB_CONFIG = {
 }
 
 # Define material patterns for inspection table mapping
-# Fixed mapping for Frame material inspection data
+# Updated mapping for Rod_Blk material inspection data with new column mappings
 
-
+# Rod_Blk Column Mapping Dictionary
+# Maps database_data columns to their corresponding inspection table columns
+ROD_BLK_COLUMN_MAPPING = {
+    # Tesla measurements from rdb5200200_checksheet table
+    'Process_2_Rod_Blk_Tesla_1_Average_Data': 'Rod_Blk_Tesla_1_Avg_Data',
+    'Process_2_Rod_Blk_Tesla_1_Maximum_Data': 'Rod_Blk_Tesla_1_Max_Data',
+    'Process_2_Rod_Blk_Tesla_1_Minimum_Data': 'Rod_Blk_Tesla_1_Min_Data',
+    'Process_2_Rod_Blk_Tesla_2_Average_Data': 'Rod_Blk_Tesla_2_Avg_Data',
+    'Process_2_Rod_Blk_Tesla_2_Maximum_Data': 'Rod_Blk_Tesla_2_Max_Data',
+    'Process_2_Rod_Blk_Tesla_2_Minimum_Data': 'Rod_Blk_Tesla_2_Min_Data',
+    'Process_2_Rod_Blk_Tesla_3_Average_Data': 'Rod_Blk_Tesla_3_Avg_Data',
+    'Process_2_Rod_Blk_Tesla_3_Maximum_Data': 'Rod_Blk_Tesla_3_Max_Data',
+    'Process_2_Rod_Blk_Tesla_3_Minimum_Data': 'Rod_Blk_Tesla_3_Min_Data',
+    'Process_2_Rod_Blk_Tesla_4_Average_Data': 'Rod_Blk_Tesla_4_Avg_Data',
+    'Process_2_Rod_Blk_Tesla_4_Maximum_Data': 'Rod_Blk_Tesla_4_Max_Data',
+    'Process_2_Rod_Blk_Tesla_4_Minimum_Data': 'Rod_Blk_Tesla_4_Min_Data',
+    
+    # Inspection measurements from rd05200200_inspection table
+    'Process_2_Rod_Blk_Inspection_1_Average_Data': 'Inspection_1_Average',
+    'Process_2_Rod_Blk_Inspection_1_Maximum_Data': 'Inspection_1_Maximum',
+    'Process_2_Rod_Blk_Inspection_1_Minimum_Data': 'Inspection_1_Minimum',
+    'Process_2_Rod_Blk_Inspection_2_Average_Data': 'Inspection_2_Average',
+    'Process_2_Rod_Blk_Inspection_2_Maximum_Data': 'Inspection_2_Maximum',
+    'Process_2_Rod_Blk_Inspection_2_Minimum_Data': 'Inspection_2_Minimum',
+    'Process_2_Rod_Blk_Inspection_3_Average_Data': 'Inspection_3_Average',
+    'Process_2_Rod_Blk_Inspection_3_Maximum_Data': 'Inspection_3_Maximum',
+    'Process_2_Rod_Blk_Inspection_3_Minimum_Data': 'Inspection_3_Minimum',
+    'Process_2_Rod_Blk_Inspection_4_Average_Data': 'Inspection_4_Average',
+    'Process_2_Rod_Blk_Inspection_4_Maximum_Data': 'Inspection_4_Maximum',
+    'Process_2_Rod_Blk_Inspection_4_Minimum_Data': 'Inspection_4_Minimum',
+    'Process_2_Rod_Blk_Inspection_5_Average_Data': 'Inspection_5_Average',
+    'Process_2_Rod_Blk_Inspection_5_Maximum_Data': 'Inspection_5_Maximum',
+    'Process_2_Rod_Blk_Inspection_5_Minimum_Data': 'Inspection_5_Minimum',
+    'Process_2_Rod_Blk_Inspection_6_Average_Data': 'Inspection_6_Average',
+    'Process_2_Rod_Blk_Inspection_6_Maximum_Data': 'Inspection_6_Maximum',
+    'Process_2_Rod_Blk_Inspection_6_Minimum_Data': 'Inspection_6_Minimum',
+    'Process_2_Rod_Blk_Inspection_7_Average_Data': 'Inspection_7_Average',
+    'Process_2_Rod_Blk_Inspection_7_Maximum_Data': 'Inspection_7_Maximum',
+    'Process_2_Rod_Blk_Inspection_7_Minimum_Data': 'Inspection_7_Minimum',
+    'Process_2_Rod_Blk_Inspection_8_Average_Data': 'Inspection_8_Breaking_Test_Average',
+    'Process_2_Rod_Blk_Inspection_8_Maximum_Data': 'Inspection_8_Breaking_Test_Maximum',
+    'Process_2_Rod_Blk_Inspection_8_Minimum_Data': 'Inspection_8_Breaking_Test_Minimum'
+}
 material_patterns = {
     'Em2p': {
         'prefix': 'Em2p',
@@ -44,7 +86,8 @@ material_patterns = {
     },
     'Rod_Blk': {
         'prefix': 'Rod_Blk',
-        'inspection_table': ['rdb5200200_checksheet', 'rdb5200200_inspection']
+        'inspection_table': ['rdb5200200_checksheet', 'rd05200200_inspection'],
+        'column_mapping': ROD_BLK_COLUMN_MAPPING
     },
     'Df_Blk': {
         'prefix': 'Df_Blk',
@@ -631,7 +674,7 @@ def calculate_rod_blk_deviations(database_df, combined_df, process_sn_list=None,
     print(f"Found {len(combined_numeric_data)} convertible numeric columns in combined DataFrame")
     print(f"All numeric column names: {list(combined_numeric_data.keys())}")
     
-    # Calculate deviations with precise column matching
+    # Calculate deviations using the enhanced column mapping
     all_columns = []
     all_database_averages = []
     all_inspection_values = []
@@ -639,83 +682,91 @@ def calculate_rod_blk_deviations(database_df, combined_df, process_sn_list=None,
     all_materials = []
     all_sns = []
     
+    print(f"\nUsing ROD_BLK_COLUMN_MAPPING with {len(ROD_BLK_COLUMN_MAPPING)} predefined mappings")
+    
     for db_col, db_avg in database_averages.items():
         if db_avg != 0:  # Avoid division by zero
             matched_col = None
             combined_value = None
             
-            # Strategy 1: Tesla measurements from checksheet table (rdb5200200_checksheet)
-            # Pattern: Process_2_Rod_Blk_Tesla_X_Type_Data -> Rod_Blk_Tesla_X_Type_Data
-            if 'Tesla' in db_col:
+            # Strategy 1: Use predefined column mapping (PRIORITY)
+            if db_col in ROD_BLK_COLUMN_MAPPING:
+                expected_col = ROD_BLK_COLUMN_MAPPING[db_col]
+                if expected_col in combined_numeric_data:
+                    matched_col = expected_col
+                    combined_value = combined_numeric_data[expected_col]
+                    print(f"  ✓ Mapped match: {db_col} -> {matched_col}")
+                else:
+                    print(f"  ✗ Mapped column not found: {db_col} -> {expected_col}")
+                    # Try alternative patterns for mapped columns
+                    if 'Tesla' in expected_col:
+                        # Try variations like Tesla_1_Avg_Data vs Tesla_1_Average_Data
+                        alt_patterns = [
+                            expected_col.replace('_Avg_', '_Average_'),
+                            expected_col.replace('_Max_', '_Maximum_'),
+                            expected_col.replace('_Min_', '_Minimum_'),
+                            expected_col.replace('_Average_', '_Avg_'),
+                            expected_col.replace('_Maximum_', '_Max_'),
+                            expected_col.replace('_Minimum_', '_Min_')
+                        ]
+                        for alt_col in alt_patterns:
+                            if alt_col in combined_numeric_data:
+                                matched_col = alt_col
+                                combined_value = combined_numeric_data[alt_col]
+                                print(f"  ✓ Alternative mapped match: {db_col} -> {matched_col}")
+                                break
+            
+            # Strategy 2: Tesla measurements fallback (if mapping failed)
+            elif 'Tesla' in db_col:
                 match = re.search(r'Process_2_Rod_Blk_Tesla_(\d+)_(\w+)_Data', db_col)
                 if match:
                     tesla_num, data_type = match.groups()
                     
                     # Try multiple Tesla column name patterns
                     possible_cols = [
-                        f'Rod_Blk_Tesla_{tesla_num}_{data_type}_Data',  # Full name
-                        f'Rod_Blk_Tesla_{tesla_num}_Max_Data' if data_type == 'Maximum' else f'Rod_Blk_Tesla_{tesla_num}_{data_type}_Data',  # Max instead of Maximum
-                        f'Rod_Blk_Tesla_{tesla_num}_Min_Data' if data_type == 'Minimum' else f'Rod_Blk_Tesla_{tesla_num}_{data_type}_Data',  # Min instead of Minimum
-                        f'Rod_Blk_Tesla_{tesla_num}_Avg_Data' if data_type == 'Average' else f'Rod_Blk_Tesla_{tesla_num}_{data_type}_Data'   # Avg instead of Average
+                        f'Rod_Blk_Tesla_{tesla_num}_{data_type}_Data',
+                        f'Rod_Blk_Tesla_{tesla_num}_Max_Data' if data_type == 'Maximum' else f'Rod_Blk_Tesla_{tesla_num}_{data_type}_Data',
+                        f'Rod_Blk_Tesla_{tesla_num}_Min_Data' if data_type == 'Minimum' else f'Rod_Blk_Tesla_{tesla_num}_{data_type}_Data',
+                        f'Rod_Blk_Tesla_{tesla_num}_Avg_Data' if data_type == 'Average' else f'Rod_Blk_Tesla_{tesla_num}_{data_type}_Data'
                     ]
-                    
-                    matched_col = None
-                    combined_value = None
                     
                     for expected_col in possible_cols:
                         if expected_col in combined_numeric_data:
                             matched_col = expected_col
                             combined_value = combined_numeric_data[expected_col]
-                            print(f"  Tesla match: {db_col} -> {matched_col}")
+                            print(f"  ✓ Tesla fallback match: {db_col} -> {matched_col}")
                             break
-                    
-                    if not matched_col:
-                        # Debug: Show available Tesla columns
-                        available_tesla_cols = [col for col in combined_numeric_data.keys() if 'Tesla' in col and tesla_num in col]
-                        print(f"  Expected Tesla column not found for {db_col}")
-                        print(f"    Tried: {possible_cols}")
-                        print(f"    Available Tesla_{tesla_num} columns: {available_tesla_cols}")
             
-            # Strategy 2: Inspection measurements from inspection table (rd05200200_inspection)
-            # Pattern: Process_2_Rod_Blk_Inspection_X_Type_Data -> Inspection_X_Type
+            # Strategy 3: Inspection measurements fallback (if mapping failed)
             elif 'Inspection' in db_col:
                 match = re.search(r'Process_2_Rod_Blk_Inspection_(\d+)_(\w+)_Data', db_col)
                 if match:
                     insp_num, data_type = match.groups()
-                    
-                    # Build expected inspection column name (exact format from rd05200200_inspection table)
                     expected_col = f'Inspection_{insp_num}_{data_type}'
                     
                     if expected_col in combined_numeric_data:
                         matched_col = expected_col
                         combined_value = combined_numeric_data[expected_col]
-                        print(f"  Inspection match: {db_col} -> {matched_col}")
-                    else:
-                        # Debug: Show what inspection columns are actually available
-                        available_inspection_cols = [col for col in combined_numeric_data.keys() if 'Inspection' in col]
-                        print(f"  Expected inspection column not found: {expected_col}")
-                        print(f"    Available inspection columns: {available_inspection_cols}")
+                        print(f"  ✓ Inspection fallback match: {db_col} -> {matched_col}")
             
-            # Strategy 3: Direct match for any other columns
+            # Strategy 4: Direct match for any other columns
             elif db_col in combined_numeric_data:
                 matched_col = db_col
                 combined_value = combined_numeric_data[db_col]
-                print(f"  Direct match: {db_col} -> {matched_col}")
+                print(f"  ✓ Direct match: {db_col} -> {matched_col}")
             
-            # Strategy 4: Fallback - try to find similar column names
+            # Strategy 5: Pattern matching fallback
             else:
-                # Remove Process_2_Rod_Blk_ prefix and _Data suffix to find base pattern
                 base_pattern = db_col.replace('Process_2_Rod_Blk_', '').replace('_Data', '')
-                
                 for comb_col, comb_val in combined_numeric_data.items():
                     if base_pattern in comb_col or comb_col in base_pattern:
                         matched_col = comb_col
                         combined_value = comb_val
-                        print(f"  Pattern match: {db_col} -> {matched_col} (base: {base_pattern})")
+                        print(f"  ✓ Pattern match: {db_col} -> {matched_col} (base: {base_pattern})")
                         break
                 
                 if not matched_col:
-                    print(f"  No match found for: {db_col}")
+                    print(f"  ✗ No match found for: {db_col}")
             
             # If we found a match, calculate deviation
             if matched_col and combined_value is not None:
@@ -723,16 +774,16 @@ def calculate_rod_blk_deviations(database_df, combined_df, process_sn_list=None,
                     # Calculate deviation
                     deviation = (db_avg - combined_value) / db_avg
                     
-                    all_columns.append(matched_col)  # Use the matched inspection column name instead of database column name
+                    all_columns.append(matched_col)
                     all_database_averages.append(db_avg)
                     all_inspection_values.append(combined_value)
                     all_deviations.append(deviation)
                     all_materials.append('Rod_Blk')
                     all_sns.append(sn_list[0] if sn_list else 'N/A')
                     
-                    print(f"  Deviation calculated: {db_col} -> {matched_col} = {deviation:.6f}")
+                    print(f"  → Deviation calculated: {deviation:.6f}")
                 except Exception as e:
-                    print(f"  Error calculating deviation for {db_col}: {e}")
+                    print(f"  ✗ Error calculating deviation for {db_col}: {e}")
     
     results_df = pd.DataFrame({
         'Matched Inspection Column': all_columns,
