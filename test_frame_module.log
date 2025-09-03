@@ -1,0 +1,29 @@
+2025-09-02 10:57:18,453 - __main__ - INFO - ============================================================
+2025-09-02 10:57:18,456 - __main__ - INFO - Testing frame module
+2025-09-02 10:57:18,458 - __main__ - INFO - ============================================================
+2025-09-02 10:57:18,460 - __main__ - INFO - Importing frame module...
+2025-09-02 10:57:19,773 - __main__ - INFO - Module location: \\192.168.2.19\ai_team\individual folder\jed-san\jhun deviation\jed_material_anomaly_check\frame.py
+2025-09-02 10:57:19,778 - __main__ - WARNING - get_database_config() not found in frame module
+2025-09-02 10:57:19,781 - __main__ - INFO - 
+Available functions in frame module:
+2025-09-02 10:57:19,784 - __main__ - INFO -    - check_table_structure()
+2025-09-02 10:57:19,786 - __main__ - INFO -    - clean_database_data()
+2025-09-02 10:57:19,788 - __main__ - INFO -    - convert_to_numeric_safe()
+2025-09-02 10:57:19,790 - __main__ - INFO -    - create_db_connection()
+2025-09-02 10:57:19,792 - __main__ - INFO -    - create_engine()
+2025-09-02 10:57:19,795 - __main__ - INFO -    - create_excel_output()
+2025-09-02 10:57:19,797 - __main__ - INFO -    - create_material_sheet_data()
+2025-09-02 10:57:19,801 - __main__ - INFO -    - extract_material_codes_from_inspection_data()
+2025-09-02 10:57:19,803 - __main__ - INFO -    - filter_deviation_data_by_material()
+2025-09-02 10:57:19,805 - __main__ - INFO -    - filter_inspection_columns()
+2025-09-02 10:57:19,807 - __main__ - INFO -    - get_database_data_for_model()
+2025-09-02 10:57:19,810 - __main__ - INFO -    - get_material_inspection_data()
+2025-09-02 10:57:19,814 - __main__ - INFO -    - get_process_data_for_materials()
+2025-09-02 10:57:19,818 - __main__ - INFO -    - map_frame_inspection_columns()
+2025-09-02 10:57:19,820 - __main__ - INFO -    - normalize_inspection_columns()
+2025-09-02 10:57:19,821 - __main__ - INFO -    - perform_deviation_calculations()
+2025-09-02 10:57:19,823 - __main__ - INFO -    - process_material_data()
+2025-09-02 10:57:19,826 - __main__ - INFO -    - read_csv_with_pandas()
+2025-09-02 10:57:19,828 - __main__ - INFO - 
+Testing process_material_data()...
+2025-09-02 10:57:19,846 - __main__ - INFO - Return type: <class 'NoneType'>

@@ -9,9 +9,41 @@ import sys
 import subprocess
 import time
 import hashlib
+import logging
+import traceback
 from pathlib import Path
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
+
+# Configure logging
+log_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'material_anomaly.log')
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler(log_file),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
+
+def log_unhandled_exception(exc_type, exc_value, exc_traceback):
+    """Log unhandled exceptions"""
+    if issubclass(exc_type, KeyboardInterrupt):
+        sys.__excepthook__(exc_type, exc_value, exc_traceback)
+        return
+    
+    logger.critical("Unhandled exception", exc_info=(exc_type, exc_value, exc_traceback))
+
+# Set the exception handler
+sys.excepthook = log_unhandled_exception
+
+logger.info("=" * 50)
+logger.info("Starting Material Anomaly Detection System")
+logger.info(f"Python version: {sys.version}")
+logger.info(f"Working directory: {os.getcwd()}")
+logger.info(f"Script location: {os.path.abspath(__file__)}")
+logger.info("-" * 50)
 
 # Add current directory to Python path for module imports
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -19,14 +51,35 @@ if current_dir not in sys.path:
     sys.path.insert(0, current_dir)
 
 # Import the material processing modules
-try:
-    import frame
-    import csb_data_output
-    import rod_blk_output
-    import em_material
-    import df_blk_output
-except ImportError as e:
-    print(f"Error importing material modules: {e}")
+module_import_errors = []
+
+def import_module(module_name):
+    """Helper function to import a module with error handling"""
+    try:
+        module = __import__(module_name)
+        logger.info(f"Successfully imported {module_name} from {getattr(module, '__file__', 'unknown location')}")
+        return module
+    except ImportError as e:
+        error_msg = f"Error importing {module_name}: {str(e)}"
+        logger.error(error_msg)
+        module_import_errors.append(error_msg)
+        return None
+
+logger.info("Importing material processing modules...")
+
+# Import each module with logging
+frame = import_module('frame')
+csb_data_output = import_module('csb_data_output')
+rod_blk_output = import_module('rod_blk_output')
+em_material = import_module('em_material')
+df_blk_output = import_module('df_blk_output')
+
+if module_import_errors:
+    logger.warning(f"Encountered {len(module_import_errors)} import errors")
+    for error in module_import_errors:
+        logger.warning(error)
+else:
+    logger.info("All material processing modules imported successfully")
 
 class CSVFileHandler(FileSystemEventHandler):
     """File system event handler for monitoring CSV file changes"""
@@ -377,7 +430,7 @@ class MaterialAnomalyGUI:
             selected = self.selected_material.get()
             
             if selected == "":
-                # Show critical deviations (>0.03 or <-0.03) from all materials
+                # Show critical deviations (>0.05 or <-0.05) from all materials
                 self.display_critical_deviations()
             else:
                 # Show all data for selected material
@@ -407,7 +460,7 @@ class MaterialAnomalyGUI:
         for material_name, deviation_df in self.all_deviation_data.items():
             if not deviation_df.empty and 'Deviation' in deviation_df.columns:
                 # Filter critical deviations
-                critical_mask = (abs(deviation_df['Deviation']) > 0.03)
+                critical_mask = (abs(deviation_df['Deviation']) > 0.05)
                 critical_deviations = deviation_df[critical_mask]
                 
                 for _, row in critical_deviations.iterrows():
@@ -439,7 +492,7 @@ class MaterialAnomalyGUI:
             self.tree.insert("", tk.END, values=(data['Matched Inspection Column'], data['Deviation'], data['Material']))
         
         self.current_table_data = pd.DataFrame(critical_data)
-        self.log_event(f"Displaying {len(critical_data)} critical deviations (>0.03 or <-0.03)")
+        self.log_event(f"Displaying {len(critical_data)} critical deviations (>0.05 or <-0.05)")
     
     
     
@@ -776,8 +829,8 @@ class MaterialAnomalyGUI:
             
             for material_name, deviation_df in deviation_data.items():
                 if not deviation_df.empty and 'Deviation' in deviation_df.columns:
-                    # Filter critical deviations (>0.03 or <-0.03)
-                    critical_mask = (abs(deviation_df['Deviation']) > 0.03)
+                    # Filter critical deviations (>0.05 or <-0.05)
+                    critical_mask = (abs(deviation_df['Deviation']) > 0.05)
                     critical_deviations = deviation_df[critical_mask]
                     
                     for _, row in critical_deviations.iterrows():

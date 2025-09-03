@@ -1,0 +1,25 @@
+2025-09-02 08:45:12,697 - __main__ - INFO - ============================================================
+2025-09-02 08:45:12,711 - __main__ - INFO - Testing Material Anomaly Detection System Imports
+2025-09-02 08:45:12,714 - __main__ - INFO - ============================================================
+2025-09-02 08:45:12,718 - __main__ - INFO - Python version: 3.13.1 (tags/v3.13.1:0671451, Dec  3 2024, 19:06:28) [MSC v.1942 64 bit (AMD64)]
+2025-09-02 08:45:12,720 - __main__ - INFO - Working directory: \\192.168.2.19\ai_team\individual folder\jed-san\jhun deviation\jed_material_anomaly_check
+2025-09-02 08:45:12,723 - __main__ - INFO - Script location: \\192.168.2.19\ai_team\individual folder\jed-san\jhun deviation\jed_material_anomaly_check\test_imports.py
+2025-09-02 08:45:12,741 - __main__ - INFO - 
+Testing required Python packages...
+2025-09-02 08:45:12,886 - __main__ - INFO -    Location: C:\Python313\Lib\tkinter\__init__.py
+2025-09-02 08:45:13,849 - __main__ - INFO -    Location: C:\Users\ai.pc\AppData\Roaming\Python\Python313\site-packages\pandas\__init__.py
+2025-09-02 08:45:13,859 - __main__ - INFO -    Location: C:\Users\ai.pc\AppData\Roaming\Python\Python313\site-packages\numpy\__init__.py
+2025-09-02 08:45:14,457 - __main__ - INFO -    Location: C:\Users\ai.pc\AppData\Roaming\Python\Python313\site-packages\openpyxl\__init__.py
+2025-09-02 08:45:14,655 - __main__ - INFO -    Location: C:\Users\ai.pc\AppData\Roaming\Python\Python313\site-packages\mysql\__init__.py
+2025-09-02 08:45:14,668 - __main__ - INFO -    Location: C:\Users\ai.pc\AppData\Roaming\Python\Python313\site-packages\watchdog\__init__.py
+2025-09-02 08:45:15,045 - __main__ - INFO -    Location: C:\Users\ai.pc\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\__init__.py
+2025-09-02 08:45:15,048 - __main__ - INFO - 
+Testing material processing modules...
+2025-09-02 08:45:15,161 - __main__ - INFO -    Location: \\192.168.2.19\ai_team\individual folder\jed-san\jhun deviation\jed_material_anomaly_check\frame.py
+2025-09-02 08:45:15,269 - __main__ - INFO -    Location: \\192.168.2.19\ai_team\individual folder\jed-san\jhun deviation\jed_material_anomaly_check\csb_data_output.py
+2025-09-02 08:45:15,401 - __main__ - INFO -    Location: \\192.168.2.19\ai_team\individual folder\jed-san\jhun deviation\jed_material_anomaly_check\rod_blk_output.py
+2025-09-02 08:45:15,489 - __main__ - INFO -    Location: \\192.168.2.19\ai_team\individual folder\jed-san\jhun deviation\jed_material_anomaly_check\em_material.py
+2025-09-02 08:45:15,584 - __main__ - INFO -    Location: \\192.168.2.19\ai_team\individual folder\jed-san\jhun deviation\jed_material_anomaly_check\df_blk_output.py
+2025-09-02 08:45:15,586 - __main__ - INFO - 
+Test completed. Check the log file for details.
+2025-09-02 08:45:15,588 - __main__ - INFO - Log file: \\192.168.2.19\ai_team\individual folder\jed-san\jhun deviation\jed_material_anomaly_check\test_imports.log

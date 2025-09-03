@@ -1,0 +1,18 @@
+2025-09-02 10:54:26,665 - __main__ - INFO - ============================================================
+2025-09-02 10:54:26,667 - __main__ - INFO - Starting Material Anomaly Test GUI
+2025-09-02 10:54:26,669 - __main__ - INFO - Python version: 3.13.1 (tags/v3.13.1:0671451, Dec  3 2024, 19:06:28) [MSC v.1942 64 bit (AMD64)]
+2025-09-02 10:54:26,670 - __main__ - INFO - Working directory: \\192.168.2.19\ai_team\individual folder\jed-san\jhun deviation\jed_material_anomaly_check
+2025-09-02 10:54:26,672 - __main__ - INFO - Script location: \\192.168.2.19\ai_team\individual folder\jed-san\jhun deviation\jed_material_anomaly_check\test_gui.py
+2025-09-02 10:54:26,675 - __main__ - INFO - ------------------------------------------------------------
+2025-09-02 10:54:26,679 - __main__ - INFO - Python path:
+2025-09-02 10:54:26,698 - __main__ - INFO -   \\192.168.2.19\ai_team\individual folder\jed-san\jhun deviation\jed_material_anomaly_check
+2025-09-02 10:54:26,702 - __main__ - INFO -   C:\Python313\python313.zip
+2025-09-02 10:54:26,708 - __main__ - INFO -   C:\Python313\DLLs
+2025-09-02 10:54:26,713 - __main__ - INFO -   C:\Python313\Lib
+2025-09-02 10:54:26,715 - __main__ - INFO -   C:\Python313
+2025-09-02 10:54:26,720 - __main__ - INFO -   C:\Users\ai.pc\AppData\Roaming\Python\Python313\site-packages
+2025-09-02 10:54:26,727 - __main__ - INFO -   C:\Users\ai.pc\AppData\Roaming\Python\Python313\site-packages\win32
+2025-09-02 10:54:26,731 - __main__ - INFO -   C:\Users\ai.pc\AppData\Roaming\Python\Python313\site-packages\win32\lib
+2025-09-02 10:54:26,735 - __main__ - INFO -   C:\Users\ai.pc\AppData\Roaming\Python\Python313\site-packages\Pythonwin
+2025-09-02 10:54:26,746 - __main__ - INFO -   C:\Python313\Lib\site-packages
+2025-09-02 10:54:26,794 - __main__ - INFO - Test GUI initialized successfully
