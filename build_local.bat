@@ -1,4 +1,5 @@
 @echo off
+setlocal enabledelayedexpansion
 echo Building Material Anomaly Detection System...
 
 REM Create a temporary local directory
@@ -14,11 +15,17 @@ cd /d "%TEMP_DIR%"
 pip install -r requirements.txt
 
 echo Building executable...
-pyinstaller --noconfirm --onefile --windowed ^
+set PYINSTALLER_CMD=pyinstaller --noconfirm --onefile --windowed ^
     --name "MaterialAnomalyDetector" ^
     --icon=icon.ico ^
     --add-data "material_anomaly.log;." ^
     --add-data "*.xlsx;." ^
+    --add-data "frame.py;." ^
+    --add-data "csb_data_output.py;." ^
+    --add-data "rod_blk_output.py;." ^
+    --add-data "em_material.py;." ^
+    --add-data "df_blk_output.py;." ^
+    --add-data "check_table_schemas.py;." ^
     --hidden-import=tkinter ^
     --hidden-import=pandas ^
     --hidden-import=openpyxl ^
@@ -26,7 +33,18 @@ pyinstaller --noconfirm --onefile --windowed ^
     --hidden-import=sqlalchemy ^
     --hidden-import=matplotlib ^
     --hidden-import=PIL ^
-    main.py
+    --hidden-import=mysql.connector.plugins.caching_sha2_password ^
+    --hidden-import=mysql.connector.plugins.mysql_native_password ^
+    --hidden-import=frame ^
+    --hidden-import=csb_data_output ^
+    --hidden-import=rod_blk_output ^
+    --hidden-import=em_material ^
+    --hidden-import=df_blk_output ^
+    --hidden-import=check_table_schemas ^
+    --additional-hooks-dir=.
+
+echo Running: %PYINSTALLER_CMD%
+%PYINSTALLER_CMD% main.py
 
 echo Copying output...
 if exist "dist\MaterialAnomalyDetector.exe" (

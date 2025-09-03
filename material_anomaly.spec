@@ -2,20 +2,22 @@
 
 block_cipher = None
 
+# Add the current directory to the Python path
+import os
+import sys
+
+# Get the absolute path to the directory containing the spec file
+spec_dir = os.path.dirname(os.path.abspath(__file__))
+
+# Add the directory to sys.path if it's not already there
+if spec_dir not in sys.path:
+    sys.path.append(spec_dir)
+
 a = Analysis(
     ['main.py'],
-    pathex=[],
+    pathex=[spec_dir],  # Add the spec directory to the path
     binaries=[],
-    datas=[
-        ('frame.py', '.'),
-        ('csb_data_output.py', '.'),
-        ('rod_blk_output.py', '.'),
-        ('em_material.py', '.'),
-        ('df_blk_output.py', '.'),
-        ('check_table_schemas.py', '.'),
-        ('*.pyd', '.'),
-        ('*.dll', '.'),
-    ],
+    datas=[],
     hiddenimports=[
         'pandas',
         'openpyxl',
@@ -36,7 +38,13 @@ a = Analysis(
         'logging.handlers',
         'mysql.connector.plugins',
         'mysql.connector.plugins.caching_sha2_password',
-        'mysql.connector.plugins.mysql_native_password'
+        'mysql.connector.plugins.mysql_native_password',
+        'frame',
+        'csb_data_output',
+        'rod_blk_output',
+        'em_material',
+        'df_blk_output',
+        'check_table_schemas'
     ],
     hookspath=[],
     hooksconfig={},
