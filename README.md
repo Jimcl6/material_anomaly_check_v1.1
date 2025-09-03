@@ -176,28 +176,72 @@ The system handles:
 - **Memory Efficient**: Only loads required materials by default
 - **Scalable**: Supports additional processes and materials
 
-## Recent Updates (August 2025)
+## Build and Deployment
 
-### 1. Database Connection Fixes
-- **Fixed "Unread result found" errors** in `df_blk_output.py`
-- **Enhanced cursor management** with proper result consumption
-- **Added robust error handling** for MySQL connections
+### Building the Executable
 
-### 2. Keyword Filtering Alignment
-- **Standardized filtering** across all material files
-- **Added keywords**: 'REPAIRED', 'REPAIRED AT' 
-- **Consistent row counts**: All files now return 94 rows (previously inconsistent 66 vs 94)
-- **Files updated**: `frame.py`, `em_material.py`, `csb_data_output.py`
+#### Using build_local.bat (Recommended)
+1. Run `build_local.bat` as administrator
+2. The script will:
+   - Create a temporary local directory
+   - Copy all necessary files
+   - Install required dependencies
+   - Build the executable using PyInstaller
+   - Copy the final `MaterialAnomalyDetector.exe` to the project directory
+   - Clean up temporary files
 
-### 3. CSV File Updates
-- **Updated to**: `PICompiled2025-08-20.csv`
-- **Applied across**: All material processing files
-- **Consistent data source** for all analyses
+#### Manual Build
+```bash
+# Install required packages
+pip install -r requirements.txt
 
-### 4. Query Logic Improvements
-- **Fixed dfb_snap_data queries** to prioritize ITEM_BLOCK_CODE matching
-- **Enhanced MODEL_CODE filtering** in database_data queries
-- **Improved data correlation** between process2_data and dfb_snap_data tables
+# Build the executable
+pyinstaller --noconfirm --onefile --windowed \
+    --name "MaterialAnomalyDetector" \
+    --icon=icon.ico \
+    --add-data "material_anomaly.log;." \
+    --add-data "*.xlsx;." \
+    --hidden-import=tkinter \
+    --hidden-import=pandas \
+    --hidden-import=openpyxl \
+    --hidden-import=mysql.connector \
+    --hidden-import=sqlalchemy \
+    --hidden-import=matplotlib \
+    --hidden-import=PIL \
+    main.py
+```
+
+## Recent Updates (September 2025)
+
+### 1. Executable Build System
+- Added `build_local.bat` for reliable executable creation
+- Created `material_anomaly.spec` for PyInstaller configuration
+- Added comprehensive error handling for build process
+- Included all necessary data files in the build
+
+### 2. Debugging and Testing
+- Added `debug_frame.py` for troubleshooting frame module
+- Implemented detailed logging in `material_anomaly.log`
+- Created test scripts for module verification
+- Added error handling for missing CSV files
+
+### 3. Performance Optimizations
+- Improved database query performance
+- Optimized memory usage during material processing
+- Added batch processing for large datasets
+- Implemented connection pooling for database access
+
+### 4. User Interface Improvements
+- Enhanced error messages and logging
+- Added progress indicators for long-running operations
+- Improved data validation and error recovery
+- Added tooltips and help text
+
+### 5. Documentation
+- Updated README with build instructions
+- Added EXE_BUILD_INSTRUCTIONS.md
+- Documented all new features and changes
+- Added troubleshooting section
 
 ### 5. Material Processing Enhancements
 - **Individual material files** for specialized processing
