@@ -1,0 +1,38 @@
+Diagnostic Report - 2025-09-10 16:28:17
+
+================================================================================
+
+=== Python Environment ===
+Python Version: 3.13.1 (tags/v3.13.1:0671451, Dec  3 2024, 19:06:28) [MSC v.1942 64 bit (AMD64)]
+Executable: C:\Python313\python.exe
+Platform: Windows-11-10.0.26100-SP0
+Current Directory: \\192.168.2.19\ai_team\INDIVIDUAL FOLDER\Jed-san\material_anomaly_check_v1.1
+
+
+=== File System Access ===
+
+Checking: \\192.168.2.19\ai_team\AI Program\Outputs\PICompiled
+  Exists: True
+  Contains 267 items
+  First 5 items:
+    - New folder
+    - New folder (2)
+    - PICompiled2024-11-04.csv
+    - PICompiled2024-11-05.csv
+    - PICompiled2024-11-06.csv
+
+Checking: \\192.168.2.19\ai_team\INDIVIDUAL FOLDER\Jed-san\material_anomaly_check_v1.1\test_file.txt
+  Exists: True
+  Size: 20 bytes
+
+
+=== Database Connection Test ===
+✓ mysql.connector is installed
+✓ Successfully connected to database
+  - Database: fc_1_data_db
+  - User: hpi.python@HPI-AI-PC
+  - MySQL Version: 10.4.32-MariaDB
+
+Found 19 tables in the database
+
+✓ All required tables are present

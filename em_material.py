@@ -223,14 +223,18 @@ def get_process_data_for_materials(process_sn_list, target_materials, csv_date=N
             
             # Build query with date filter if csv_date is provided
             if csv_date:
+                # Convert date format from YYYY-MM-DD to YYYY/MM/DD for database query
+                db_date = csv_date.replace('-', '/') if csv_date else None
+                
                 query = f"""
                 SELECT {columns_str}
                 FROM {table_name}
                 WHERE {sn_column} IN ({placeholders}) AND Process_{process_num}_DATE = %s
                 """
-                # Execute query with both process_sn_list and csv_date
-                params = process_sn_list + [csv_date]
+                # Execute query with both process_sn_list and db_date
+                params = process_sn_list + [db_date]
                 cursor.execute(query, params)
+                print(f"Query: {query} with params: {params}")
             else:
                 query = f"""
                 SELECT {columns_str}
@@ -239,6 +243,13 @@ def get_process_data_for_materials(process_sn_list, target_materials, csv_date=N
                 """
                 cursor.execute(query, process_sn_list)
             rows = cursor.fetchall()
+            
+            # Debug: Show the actual query being executed
+            print(f"\n=== DEBUG: Query Details ===")
+            print(f"Table: {table_name}")
+            print(f"Query: {query}")
+            print(f"Parameters: {params if 'params' in locals() else process_sn_list}")
+            print(f"Number of rows returned: {len(rows)}")
             
             if rows:
                 print(f"Found {len(rows)} matching records in {table_name}")
@@ -1294,7 +1305,7 @@ def process_material_data():
     print(f"S/N values from CSV: {sn_list}")
     
     # Step 2: Define target materials
-    target_materials = ['Em2p', 'Em3p', 'Frame', 'Casing_Block', 'Rod_Blk', 'Df_Blk']
+    target_materials = ['Em2p', 'Em3p']
     print(f"Target materials: {target_materials}")
     
     # Step 3: Query process tables

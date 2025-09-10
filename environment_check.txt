@@ -1,0 +1,136 @@
+=== Python Environment ===
+Python Version: 3.13.1 (tags/v3.13.1:0671451, Dec  3 2024, 19:06:28) [MSC v.1942 64 bit (AMD64)]
+Executable: C:\Python313\python.exe
+Platform: Windows-11-10.0.26100-SP0
+Current Directory: \\192.168.2.19\ai_team\INDIVIDUAL FOLDER\Jed-san\material_anomaly_check_v1.1
+
+=== Installed Packages ===
+pymysql: 1.1.1
+pyqt5: 5.15.11
+pyqt5-qt5: 5.15.2
+pyqt5-sip: 12.17.0
+pyqt6: 6.9.0
+pyqt6-qt6: 6.9.0
+pyside6: 6.9.0
+pyside6-addons: 6.9.0
+pyside6-essentials: 6.9.0
+altgraph: 0.17.4
+asgiref: 3.8.1
+asttokens: 3.0.0
+certifi: 2025.4.26
+cloudpickle: 3.1.1
+colorama: 0.4.6
+comm: 0.2.3
+comtypes: 1.4.11
+configparser: 7.2.0
+contourpy: 1.3.2
+customtkinter: 5.2.2
+cycler: 0.12.1
+darkdetect: 0.8.0
+debugpy: 1.8.16
+decorator: 5.2.1
+distlib: 0.3.9
+django: 5.2.1
+et-xmlfile: 2.0.0
+executing: 2.2.0
+filelock: 3.18.0
+fonttools: 4.57.0
+greenlet: 3.2.2
+ipykernel: 6.30.1
+ipython: 9.4.0
+ipython-pygments-lexers: 1.1.1
+jdcal: 1.4.1
+jedi: 0.19.2
+joblib: 1.5.1
+jupyter-client: 8.6.3
+jupyter-core: 5.8.1
+keyboard: 0.13.5
+kiwisolver: 1.4.8
+llvmlite: 0.44.0
+loguru: 0.7.3
+matplotlib: 3.10.3
+matplotlib-inline: 0.1.7
+mysql-connector-python: 9.3.0
+mysqlclient: 2.2.7
+nest-asyncio: 1.6.0
+numba: 0.61.2
+numpy: 2.2.5
+observer: 0.1.0
+openpyxl: 3.1.5
+packaging: 25.0
+pandas: 2.2.3
+parso: 0.8.4
+pefile: 2023.2.7
+pillow: 11.2.1
+pip: 25.2
+pipenv: 2025.0.2
+platformdirs: 4.3.8
+prompt-toolkit: 3.0.51
+psutil: 7.0.0
+pure-eval: 0.2.3
+pygame: 2.6.1
+pygments: 2.19.2
+pyinstaller: 6.15.0
+pyinstaller-hooks-contrib: 2025.8
+pyparsing: 3.2.3
+pypiwin32: 223
+pyqt6-sip: 13.10.2
+pyserial: 3.5
+python-calamine: 0.4.0
+python-dateutil: 2.9.0.post0
+pyttsx3: 2.98
+pytz: 2025.2
+pywin32: 310
+pywin32-ctypes: 0.2.3
+pyzmq: 27.0.1
+scikit-learn: 1.7.0
+scipy: 1.16.0
+setuptools: 80.8.0
+shap: 0.48.0
+shiboken6: 6.9.0
+six: 1.17.0
+slicer: 0.0.8
+sqlalchemy: 2.0.41
+sqlparse: 0.5.3
+stack-data: 0.6.3
+threadpoolctl: 3.6.0
+tornado: 6.5.1
+tqdm: 4.67.1
+traitlets: 5.14.3
+typing-extensions: 4.13.2
+tzdata: 2025.2
+virtualenv: 20.31.2
+watchdog: 6.0.0
+wcwidth: 0.2.13
+win32-setctime: 1.2.0
+wrong-material-detector: 0.1
+xgboost: 3.0.2
+xlrd: 2.0.2
+xlsxwriter: 3.2.5
+autocommand: 2.2.2
+backports.tarfile: 1.2.0
+importlib-metadata: 8.0.0
+inflect: 7.3.1
+jaraco.collections: 5.1.0
+jaraco.context: 5.3.0
+jaraco.functools: 4.0.1
+jaraco.text: 3.12.1
+more-itertools: 10.3.0
+tomli: 2.0.1
+typeguard: 4.3.0
+wheel: 0.45.1
+zipp: 3.19.2
+
+=== File System Access ===
+Testing access to: \\192.168.2.19\ai_team\AI Program\Outputs\PICompiled
+Path exists: True
+Number of files: 267
+First 5 files:
+  - New folder
+  - New folder (2)
+  - PICompiled2024-11-04.csv
+  - PICompiled2024-11-05.csv
+  - PICompiled2024-11-06.csv
+
+=== Database Connection Test ===
+mysql.connector is installed
