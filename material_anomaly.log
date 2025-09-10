@@ -2812,3 +2812,16 @@
 2025-09-10 17:16:17,728 - __main__ - INFO - Successfully imported em_material from \\192.168.2.19\ai_team\INDIVIDUAL FOLDER\Jed-san\material_anomaly_check_v1.1\em_material.py
 2025-09-10 17:16:17,843 - __main__ - INFO - Successfully imported df_blk_output from \\192.168.2.19\ai_team\INDIVIDUAL FOLDER\Jed-san\material_anomaly_check_v1.1\df_blk_output.py
 2025-09-10 17:16:17,848 - __main__ - INFO - All material processing modules imported successfully
+2025-09-10 17:32:26,964 - __main__ - INFO - ==================================================
+2025-09-10 17:32:26,968 - __main__ - INFO - Starting Material Anomaly Detection System
+2025-09-10 17:32:26,971 - __main__ - INFO - Python version: 3.12.2 (tags/v3.12.2:6abddd9, Feb  6 2024, 21:26:36) [MSC v.1937 64 bit (AMD64)]
+2025-09-10 17:32:26,974 - __main__ - INFO - Working directory: \\192.168.2.19\ai_team\INDIVIDUAL FOLDER\Jed-san\material_anomaly_check_v1.1
+2025-09-10 17:32:26,980 - __main__ - INFO - Script location: \\192.168.2.19\ai_team\INDIVIDUAL FOLDER\Jed-san\material_anomaly_check_v1.1\em_material.py
+2025-09-10 17:32:26,983 - __main__ - INFO - --------------------------------------------------
+2025-09-10 17:32:26,986 - __main__ - INFO - Importing material processing modules...
+2025-09-10 17:32:26,989 - __main__ - INFO - Successfully imported frame from \\192.168.2.19\ai_team\INDIVIDUAL FOLDER\Jed-san\material_anomaly_check_v1.1\frame.py
+2025-09-10 17:32:26,993 - __main__ - INFO - Successfully imported csb_data_output from \\192.168.2.19\ai_team\INDIVIDUAL FOLDER\Jed-san\material_anomaly_check_v1.1\csb_data_output.py
+2025-09-10 17:32:26,996 - __main__ - INFO - Successfully imported rod_blk_output from \\192.168.2.19\ai_team\INDIVIDUAL FOLDER\Jed-san\material_anomaly_check_v1.1\rod_blk_output.py
+2025-09-10 17:32:26,998 - __main__ - INFO - Successfully imported em_material from \\192.168.2.19\ai_team\INDIVIDUAL FOLDER\Jed-san\material_anomaly_check_v1.1\em_material.py
+2025-09-10 17:32:27,001 - __main__ - INFO - Successfully imported df_blk_output from \\192.168.2.19\ai_team\INDIVIDUAL FOLDER\Jed-san\material_anomaly_check_v1.1\df_blk_output.py
+2025-09-10 17:32:27,003 - __main__ - INFO - All material processing modules imported successfully
