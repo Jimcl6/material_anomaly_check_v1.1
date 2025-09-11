@@ -4196,3 +4196,212 @@
 2025-09-11 07:03:40,780 - __main__ - INFO - Successfully imported em_material from \\192.168.2.19\ai_team\INDIVIDUAL FOLDER\Jed-san\JHUN DEVIATION\jed_material_anomaly_check\em_material.py
 2025-09-11 07:03:40,950 - __main__ - INFO - Successfully imported df_blk_output from \\192.168.2.19\ai_team\INDIVIDUAL FOLDER\Jed-san\JHUN DEVIATION\jed_material_anomaly_check\df_blk_output.py
 2025-09-11 07:03:40,950 - __main__ - INFO - All material processing modules imported successfully
+2025-09-11 07:50:09,631 - __main__ - INFO - ==================================================
+2025-09-11 07:50:09,635 - __main__ - INFO - Starting Material Anomaly Detection System
+2025-09-11 07:50:09,638 - __main__ - INFO - Python version: 3.13.1 (tags/v3.13.1:0671451, Dec  3 2024, 19:06:28) [MSC v.1942 64 bit (AMD64)]
+2025-09-11 07:50:09,640 - __main__ - INFO - Working directory: \\192.168.2.19\ai_team\individual folder\jed-san\jhun deviation\jed_material_anomaly_check
+2025-09-11 07:50:09,643 - __main__ - INFO - Script location: \\192.168.2.19\ai_team\individual folder\jed-san\jhun deviation\jed_material_anomaly_check\main.py
+2025-09-11 07:50:09,649 - __main__ - INFO - --------------------------------------------------
+2025-09-11 07:50:09,653 - __main__ - INFO - Importing material processing modules...
+2025-09-11 07:50:10,478 - __main__ - INFO - Successfully imported frame from \\192.168.2.19\ai_team\individual folder\jed-san\jhun deviation\jed_material_anomaly_check\frame.py
+2025-09-11 07:50:10,650 - __main__ - INFO - Successfully imported csb_data_output from \\192.168.2.19\ai_team\individual folder\jed-san\jhun deviation\jed_material_anomaly_check\csb_data_output.py
+2025-09-11 07:50:11,339 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:50:11,342 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:50:11,347 - mysql.connector - INFO - package: mysql.connector.plugins
+2025-09-11 07:50:11,351 - mysql.connector - INFO - plugin_name: mysql_native_password
+2025-09-11 07:50:11,357 - mysql.connector - INFO - AUTHENTICATION_PLUGIN_CLASS: MySQLNativePasswordAuthPlugin
+2025-09-11 07:50:11,386 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:50:11,575 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:50:11,578 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:50:11,583 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:50:11,643 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:50:11,646 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:50:11,650 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:50:11,928 - __main__ - INFO - Successfully imported rod_blk_output from \\192.168.2.19\ai_team\individual folder\jed-san\jhun deviation\jed_material_anomaly_check\rod_blk_output.py
+2025-09-11 07:50:12,055 - __main__ - INFO - Successfully imported em_material from \\192.168.2.19\ai_team\individual folder\jed-san\jhun deviation\jed_material_anomaly_check\em_material.py
+2025-09-11 07:50:12,139 - __main__ - INFO - Successfully imported df_blk_output from \\192.168.2.19\ai_team\individual folder\jed-san\jhun deviation\jed_material_anomaly_check\df_blk_output.py
+2025-09-11 07:50:12,185 - __main__ - INFO - All material processing modules imported successfully
+2025-09-11 07:50:27,482 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:50:27,485 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:50:27,491 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:50:27,506 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:50:27,515 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:50:27,520 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:50:28,008 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:50:28,012 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:50:28,020 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:50:28,127 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:50:28,130 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:50:28,139 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:50:28,152 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:50:28,155 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:50:28,160 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:50:29,932 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:50:29,934 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:50:29,938 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:50:29,949 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:50:29,957 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:50:29,965 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:50:30,316 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:50:30,319 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:50:30,323 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:50:30,390 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:50:30,392 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:50:30,397 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:50:30,423 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:50:30,426 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:50:30,432 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:50:30,708 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:50:30,712 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:50:30,724 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:50:30,740 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:50:30,748 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:50:30,756 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:50:31,075 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:50:31,078 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:50:31,083 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:50:31,205 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:50:31,208 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:50:31,213 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:50:32,059 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:50:32,064 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:50:32,067 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:50:32,101 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:50:32,104 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:50:32,113 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:50:32,235 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:50:32,239 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:50:32,244 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:50:32,320 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:50:32,326 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:50:32,331 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:50:32,388 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:50:32,392 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:50:32,405 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:51:04,422 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:51:04,425 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:51:04,431 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:51:04,450 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:51:04,454 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:51:04,459 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:51:04,751 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:51:04,754 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:51:04,760 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:51:04,814 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:51:04,820 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:51:04,828 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:51:04,845 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:51:04,849 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:51:04,853 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:51:05,711 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:51:05,713 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:51:05,717 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:51:05,728 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:51:05,733 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:51:05,740 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:51:06,055 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:51:06,058 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:51:06,063 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:51:06,090 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:51:06,092 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:51:06,096 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:51:06,135 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:51:06,141 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:51:06,145 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:51:06,384 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:51:06,386 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:51:06,394 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:51:06,411 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:51:06,416 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:51:06,421 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:51:06,669 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:51:06,674 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:51:06,680 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:51:06,764 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:51:06,769 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:51:06,773 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:51:07,629 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:51:07,631 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:51:07,643 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:51:07,683 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:51:07,687 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:51:07,694 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:51:07,725 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:51:07,732 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:51:07,738 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:51:07,761 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:51:07,766 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:51:07,789 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:51:07,814 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:51:07,816 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:51:07,825 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:51:44,433 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:51:44,435 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:51:44,440 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:51:44,483 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:51:44,486 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:51:44,492 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:51:44,567 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:51:44,594 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:51:44,615 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:51:44,857 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:51:44,859 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:51:44,877 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:51:44,954 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:51:44,966 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:51:44,979 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:51:45,071 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:51:45,078 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:51:45,094 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:54:36,613 - __main__ - INFO - ==================================================
+2025-09-11 07:54:36,636 - __main__ - INFO - Starting Material Anomaly Detection System
+2025-09-11 07:54:36,664 - __main__ - INFO - Python version: 3.13.1 (tags/v3.13.1:0671451, Dec  3 2024, 19:06:28) [MSC v.1942 64 bit (AMD64)]
+2025-09-11 07:54:36,684 - __main__ - INFO - Working directory: \\192.168.2.19\ai_team\individual folder\jed-san\jhun deviation\jed_material_anomaly_check
+2025-09-11 07:54:36,693 - __main__ - INFO - Script location: \\192.168.2.19\ai_team\individual folder\jed-san\jhun deviation\jed_material_anomaly_check\main.py
+2025-09-11 07:54:36,704 - __main__ - INFO - --------------------------------------------------
+2025-09-11 07:54:36,718 - __main__ - INFO - Importing material processing modules...
+2025-09-11 07:54:37,586 - __main__ - INFO - Successfully imported frame from \\192.168.2.19\ai_team\individual folder\jed-san\jhun deviation\jed_material_anomaly_check\frame.py
+2025-09-11 07:54:38,794 - __main__ - INFO - Successfully imported csb_data_output from \\192.168.2.19\ai_team\individual folder\jed-san\jhun deviation\jed_material_anomaly_check\csb_data_output.py
+2025-09-11 07:54:39,923 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:54:39,927 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:54:39,980 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:54:40,086 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:54:40,099 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:54:40,112 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:54:40,147 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:54:40,152 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:54:40,161 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:54:40,314 - __main__ - INFO - Successfully imported rod_blk_output from \\192.168.2.19\ai_team\individual folder\jed-san\jhun deviation\jed_material_anomaly_check\rod_blk_output.py
+2025-09-11 07:54:40,565 - __main__ - INFO - Successfully imported em_material from \\192.168.2.19\ai_team\individual folder\jed-san\jhun deviation\jed_material_anomaly_check\em_material.py
+2025-09-11 07:54:40,758 - __main__ - INFO - Successfully imported df_blk_output from \\192.168.2.19\ai_team\individual folder\jed-san\jhun deviation\jed_material_anomaly_check\df_blk_output.py
+2025-09-11 07:54:40,763 - __main__ - INFO - All material processing modules imported successfully
+2025-09-11 07:54:50,670 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:54:50,673 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:54:50,692 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:54:50,754 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:54:50,766 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:54:50,790 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:54:51,823 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:54:51,828 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:54:51,871 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:54:51,968 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:54:51,988 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:54:52,011 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:54:53,120 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:54:53,127 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:54:53,175 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:54:53,304 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:54:53,314 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:54:53,358 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:54:53,508 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:54:53,539 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:54:53,563 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:54:54,734 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:54:54,737 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:54:54,746 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:54:54,758 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:54:54,761 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:54:54,767 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-09-11 07:54:55,111 - mysql.connector - DEBUG - Starting authorization phase
+2025-09-11 07:54:55,114 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-09-11 07:54:55,119 - mysql.connector - DEBUG - mysql_native_password completed succesfully
