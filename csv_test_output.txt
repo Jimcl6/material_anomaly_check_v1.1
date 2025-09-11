@@ -1,0 +1,14 @@
+Testing CSV file access...
+
+Testing path: \\\\192.168.2.19\\ai_team\\AI Program\\Outputs\\PICompiled
+Path exists: False
+
+Testing path: //192.168.2.19/ai_team/AI Program/Outputs/PICompiled
+Path exists: True
+Directory listing successful. Found 267 items.
+First 5 items:
+  - New folder
+  - New folder (2)
+  - PICompiled2024-11-04.csv
+  - PICompiled2024-11-05.csv
+  - PICompiled2024-11-06.csv

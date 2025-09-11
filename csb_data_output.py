@@ -221,24 +221,47 @@ def get_process_data_for_materials(process_sn_list, target_materials, csv_date=N
             # Build the final query with existing columns
             columns_str = ', '.join(existing_columns)
             
-            # Build query with date filter if csv_date is provided
+            # Try different date formats if csv_date is provided
+            date_formats = []
             if csv_date:
+                # Add original format
+                date_formats.append(csv_date)
+                # Add YYYY/MM/DD format if different
+                if '-' in csv_date:
+                    date_formats.append(csv_date.replace('-', '/'))
+                # Add just date part if it's a timestamp
+                if ' ' in csv_date:
+                    date_formats.append(csv_date.split(' ')[0])
+            
+            # Try each date format until we get results
+            rows = []
+            for date_fmt in date_formats:
                 query = f"""
                 SELECT {columns_str}
                 FROM {table_name}
                 WHERE {sn_column} IN ({placeholders}) AND Process_{process_num}_DATE = %s
                 """
-                # Execute query with both process_sn_list and csv_date
-                params = process_sn_list + [csv_date]
+                params = process_sn_list + [date_fmt]
+                print(f"Trying query with date format: {date_fmt}")
                 cursor.execute(query, params)
-            else:
+                rows = cursor.fetchall()
+                if rows:
+                    print(f"Found {len(rows)} rows with date format: {date_fmt}")
+                    break
+            
+            # If no rows found with date filter, try without date
+            if not rows:
+                print(f"No rows found with date filter, trying without date")
                 query = f"""
                 SELECT {columns_str}
                 FROM {table_name}
                 WHERE {sn_column} IN ({placeholders})
+                ORDER BY Process_{process_num}_DATE DESC
                 """
                 cursor.execute(query, process_sn_list)
-            rows = cursor.fetchall()
+                rows = cursor.fetchall()
+                if rows:
+                    print(f"Found {len(rows)} rows without date filter")
             
             if rows:
                 print(f"Found {len(rows)} matching records in {table_name}")
@@ -1284,16 +1307,51 @@ def process_material_data():
     # Step 1: Get Process S/N from CSV
     print("\n1. Reading CSV data...")
     csv_data = read_csv_with_pandas(FILEPATH)
-    
     if csv_data is None or csv_data.empty:
-        print("Failed to read CSV data or no data found")
-        return None
+        print("No valid data found in CSV. Exiting.")
+        return {'deviation_data': pd.DataFrame()}
     
-    # Extract Process S/N values and actual S/N values
-    process_sn_list = csv_data['PROCESS S/N'].tolist()
-    sn_list = csv_data['S/N'].tolist()
-    print(f"Process S/N values from CSV: {process_sn_list}")
-    print(f"S/N values from CSV: {sn_list}")
+    # Get the last row of the CSV data
+    last_row = csv_data.iloc[0]  # read_csv_with_pandas already returns the last row
+    date = last_row['DATE']
+    model_code = last_row['MODEL CODE']
+    process_sn = last_row['PROCESS S/N']
+    sn = last_row['S/N']
+    
+    # Ensure date is in consistent format
+    if date and '/' in date:
+        date = date.replace('/', '-')
+        print(f"Converted date format to YYYY-MM-DD: {date}")
+    
+    print(f"Extracted from CSV - DATE: {date}, MODEL CODE: {model_code}, PROCESS S/N: {process_sn}, S/N: {sn}")
+    
+    # Get process data for materials
+    print("\n2. Querying process data for materials...")
+    print(f"Searching for Process S/N: {process_sn} with DATE: {date}")
+    
+    # Try different date formats if needed
+    date_formats = [
+        date,  # Original format
+        date.replace('-', '/') if date and '-' in date else date,  # YYYY/MM/DD
+        date.split(' ')[0] if date and ' ' in date else date,  # Just date part if timestamp
+    ]
+    
+    material_results = None
+    for date_fmt in date_formats:
+        if not date_fmt:
+            continue
+            
+        print(f"Trying date format: {date_fmt}")
+        material_results = get_process_data_for_materials([process_sn], ['Casing_Block'], date_fmt)
+        
+        # Check if we got any results
+        if material_results and any(process_data for process_data in material_results.values()):
+            print(f"Successfully found data with date format: {date_fmt}")
+            break
+            
+    if not material_results or not any(process_data for process_data in material_results.values()):
+        print("WARNING: Could not find matching data with any date format. Trying without date filter...")
+        material_results = get_process_data_for_materials([process_sn], ['Casing_Block'], None)
     
     # Step 2: Define target materials
     target_materials = ['Casing_Block']

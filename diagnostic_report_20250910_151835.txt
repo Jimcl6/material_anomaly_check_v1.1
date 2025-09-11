@@ -1,0 +1,17 @@
+Diagnostic Report - 2025-09-10 15:18:35
+================================================================================
+
+================================================================================
+SYSTEM INFORMATION
+================================================================================
+Operating System: Windows 11
+Version: 10.0.26100
+Machine: AMD64
+Processor: Intel64 Family 6 Model 183 Stepping 1, GenuineIntel
+Python Version: 3.13.1
+Python Executable: C:\Python313\python.exe
+
+================================================================================
+NETWORK RESOURCES CHECK
+================================================================================
+Checking CSV directory: \\192.168.2.19\ai_team\AI Program\Outputs\PICompiled

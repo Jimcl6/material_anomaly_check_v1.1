@@ -94,13 +94,53 @@ def get_process2_data(process_sn, date):
         connection = mysql.connector.connect(**DB_CONFIG)
         cursor = connection.cursor(dictionary=True)
         
+        # Debug: Print the input parameters
+        print(f"DEBUG: Searching process2_data with Process_2_S_N: {process_sn}, Process_2_DATE: {date}")
+        
+        # First try with exact date match (YYYY-MM-DD)
         query = """
-        SELECT Process_2_Df_Blk, Process_2_Df_Blk_Lot_No 
+        SELECT Process_2_Df_Blk, Process_2_Df_Blk_Lot_No, Process_2_DATE, Process_2_S_N
         FROM process2_data 
         WHERE Process_2_S_N = %s AND Process_2_DATE = %s
         """
         
         cursor.execute(query, (process_sn, date))
+        result = cursor.fetchone()
+        
+        # If no result, try with date in YYYY/MM/DD format
+        if not result and date and '-' in date:
+            alt_date = date.replace('-', '/')
+            print(f"No results with date format YYYY-MM-DD, trying YYYY/MM/DD format: {alt_date}")
+            cursor.execute(query, (process_sn, alt_date))
+            result = cursor.fetchone()
+            
+        # If still no result, try with just the date part (in case of timestamp)
+        if not result and date and ' ' in date:
+            date_part = date.split(' ')[0]
+            print(f"No results with timestamp, trying date part only: {date_part}")
+            cursor.execute(query, (process_sn, date_part))
+            result = cursor.fetchone()
+            
+        # If still no result, try just matching by S/N
+        if not result:
+            print(f"No results with date filter, trying to find any record with Process_2_S_N: {process_sn}")
+            query = """
+            SELECT Process_2_Df_Blk, Process_2_Df_Blk_Lot_No, Process_2_DATE, Process_2_S_N
+            FROM process2_data 
+            WHERE Process_2_S_N = %s
+            ORDER BY Process_2_DATE DESC
+            LIMIT 1
+            """
+            cursor.execute(query, (process_sn,))
+            result = cursor.fetchone()
+            
+        # Log the result for debugging
+        if result:
+            print(f"Found process2_data record: {result}")
+            return result['Process_2_Df_Blk'], result['Process_2_Df_Blk_Lot_No']
+        else:
+            print(f"No matching record found in process2_data for S/N: {process_sn}")
+            return None, None
         result = cursor.fetchone()
         
         # Consume any remaining results to avoid "Unread result found" error
@@ -720,11 +760,41 @@ def process_material_data():
             print("Failed to extract required data from CSV. Exiting.")
             return {'deviation_data': pd.DataFrame()}
         
+        # Ensure date is in YYYY-MM-DD format
+        if date and '/' in date:
+            date = date.replace('/', '-')
+            print(f"Converted date format to YYYY-MM-DD: {date}")
+        
         print(f"DEBUG: CSV data extracted successfully - DATE: {date}, MODEL CODE: {model_code}, PROCESS S/N: {process_sn}")
         
-        # Step 2: Query process2_data table
+        # Step 2: Query process2_data table with multiple date format attempts
         print("\n2. Querying process2_data table...")
-        df_blk_value, df_blk_lot_no = get_process2_data(process_sn, date)
+        print(f"Searching for Process_2_S_N: {process_sn} with DATE: {date}")
+        
+        # Try different date formats if needed
+        date_formats = [
+            date,  # Original format
+            date.replace('-', '/') if date and '-' in date else date,  # YYYY/MM/DD
+            date.split(' ')[0] if date and ' ' in date else date,  # Just date part if timestamp
+        ]
+        
+        df_blk_value = None
+        df_blk_lot_no = None
+        
+        for date_fmt in date_formats:
+            if not date_fmt:
+                continue
+                
+            print(f"Trying date format: {date_fmt}")
+            df_blk_value, df_blk_lot_no = get_process2_data(process_sn, date_fmt)
+            
+            if df_blk_value is not None and df_blk_lot_no is not None:
+                print(f"Successfully found data with date format: {date_fmt}")
+                break
+                
+        if df_blk_value is None or df_blk_lot_no is None:
+            print("WARNING: Could not find matching data with any date format. Trying without date filter...")
+            df_blk_value, df_blk_lot_no = get_process2_data(process_sn, None)
         
         if not df_blk_value and not df_blk_lot_no:
             print(f"DEBUG: No Df_Blk data found in process2_data for PROCESS S/N: {process_sn}, DATE: {date}")
