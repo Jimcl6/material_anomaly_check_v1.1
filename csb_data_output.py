@@ -148,10 +148,18 @@ def get_process_data_for_materials(process_sn_list, target_materials, csv_date=N
     """
     connection = create_db_connection()
     if not connection:
+        print("Failed to create database connection")
         return None
     
     results = {}
-    target_materials = ['Casing_Block']
+    # Use provided target_materials but ensure it's a list and not empty
+    if not target_materials:
+        target_materials = ['Casing_Block']
+    
+    print(f"Target materials: {target_materials}")
+    print(f"Process S/N list: {process_sn_list}")
+    if csv_date:
+        print(f"Using date filter: {csv_date}")
     
     try:
         cursor = connection.cursor(dictionary=True)
@@ -178,22 +186,61 @@ def get_process_data_for_materials(process_sn_list, target_materials, csv_date=N
             sn_column = f"Process_{process_num}_S_N"
             
             # Build the query to select the materials and their lot numbers
-            # Based on the table structure, materials are stored as individual columns
             material_columns = []
+            material_patterns = [
+                # Try exact match first
+                lambda m: f"Process_{process_num}_{m}",
+                # Try with space instead of underscore
+                lambda m: f"Process {process_num} {m}",
+                # Try with different case
+                lambda m: f"PROCESS_{process_num}_{m.upper()}",
+                # Try with different separators
+                lambda m: f"Process-{process_num}-{m}",
+                # Try with different naming conventions
+                lambda m: f"P{process_num}_{m}",
+                lambda m: f"P{process_num}_{m.replace('_', '')}",
+            ]
+            
+            # For each material, try different naming patterns
             for material in target_materials:
-                if material in ['Em2p', 'Em3p']:  # These materials exist in process1_data
-                    material_columns.append(f"Process_{process_num}_{material}")
-                    material_columns.append(f"Process_{process_num}_{material}_Lot_No")
-                elif material == 'Casing_Block':
-                    # Check if there's a Casing_Block column or similar
-                    material_columns.append(f"Process_{process_num}_Casing_Block")
-                    material_columns.append(f"Process_{process_num}_Casing_Block_Lot_No")
-                elif material == 'Rod_Blk':
-                    material_columns.append(f"Process_{process_num}_Rod_Blk")
-                    material_columns.append(f"Process_{process_num}_Rod_Blk_Lot_No")
-                elif material == 'Df_Blk':
-                    material_columns.append(f"Process_{process_num}_Df_Blk")
-                    material_columns.append(f"Process_{process_num}_Df_Blk_Lot_No")
+                material_found = False
+                
+                # Try different patterns until we find a match
+                for pattern in material_patterns:
+                    try:
+                        base_col = pattern(material)
+                        lot_col = f"{base_col}_Lot_No"
+                        
+                        # Test if base column exists
+                        test_query = f"SHOW COLUMNS FROM {table_name} LIKE %s"
+                        cursor.execute(test_query, (base_col,))
+                        if cursor.fetchone():
+                            material_columns.extend([base_col, lot_col])
+                            material_found = True
+                            print(f"Found material column: {base_col} in {table_name}")
+                            break
+                    except Exception as e:
+                        print(f"Error checking column pattern {base_col}: {e}")
+                
+                if not material_found:
+                    print(f"Warning: Could not find column for material {material} in {table_name}")
+            
+            # If no material columns found, try to discover them
+            if not material_columns and process_num == 3:  # Special handling for process3_data
+                print(f"\nTrying to discover material columns in {table_name}...")
+                cursor.execute(f"SHOW COLUMNS FROM {table_name} LIKE '%Casing%'")
+                casing_cols = cursor.fetchall()
+                if casing_cols:
+                    print(f"Found potential Casing_Block columns: {[c[0] for c in casing_cols]}")
+                    for col in casing_cols:
+                        if 'lot' not in col[0].lower():
+                            material_columns.append(col[0])
+                            lot_col = f"{col[0]}_Lot_No"
+                            cursor.execute(f"SHOW COLUMNS FROM {table_name} LIKE %s", (lot_col,))
+                            if cursor.fetchone():
+                                material_columns.append(lot_col)
+                            else:
+                                material_columns.append(col[0].replace('_Code', '_Lot_No'))
             
             # Add basic columns
             select_columns = [sn_column, f"Process_{process_num}_Model_Code", f"Process_{process_num}_DateTime", f"Process_{process_num}_DATE"]
@@ -206,13 +253,31 @@ def get_process_data_for_materials(process_sn_list, target_materials, csv_date=N
             existing_columns = []
             for col in select_columns:
                 try:
-                    test_query = f"SELECT {col} FROM {table_name} LIMIT 1"
-                    cursor.execute(test_query)
-                    cursor.fetchall()
-                    existing_columns.append(col)
-                except:
-                    print(f"Column {col} does not exist in {table_name}")
-                    continue
+                    # First try with SHOW COLUMNS which is safer
+                    cursor.execute(f"SHOW COLUMNS FROM {table_name} LIKE %s", (col,))
+                    if cursor.fetchone():
+                        existing_columns.append(col)
+                    else:
+                        print(f"Column {col} does not exist in {table_name}")
+                except Exception as e:
+                    print(f"Error checking column {col} in {table_name}: {e}")
+                    
+            if not existing_columns and process_num == 3:  # Special case for process3_data
+                print(f"\nNo valid columns found in {table_name}. Trying to find any material columns...")
+                cursor.execute(f"SHOW COLUMNS FROM {table_name}")
+                all_columns = [col[0] for col in cursor.fetchall()]
+                print(f"Available columns in {table_name}: {all_columns}")
+                
+                # Try to find any material-like columns
+                for col in all_columns:
+                    if any(x in col.lower() for x in ['casing', 'block', 'material', 'part', 'component']):
+                        existing_columns.append(col)
+                        print(f"Found potential material column: {col}")
+                
+                if not existing_columns and all_columns:
+                    # If still no columns, just take the first few non-ID columns
+                    existing_columns = [col for col in all_columns if 'id' not in col.lower()][:5]
+                    print(f"Using first few available columns: {existing_columns}")
             
             if not existing_columns:
                 print(f"No valid columns found in {table_name}")
@@ -221,47 +286,53 @@ def get_process_data_for_materials(process_sn_list, target_materials, csv_date=N
             # Build the final query with existing columns
             columns_str = ', '.join(existing_columns)
             
-            # Try different date formats if csv_date is provided
-            date_formats = []
+            # Build query with date filter if csv_date is provided
             if csv_date:
-                # Add original format
-                date_formats.append(csv_date)
-                # Add YYYY/MM/DD format if different
-                if '-' in csv_date:
-                    date_formats.append(csv_date.replace('-', '/'))
-                # Add just date part if it's a timestamp
-                if ' ' in csv_date:
-                    date_formats.append(csv_date.split(' ')[0])
-            
-            # Try each date format until we get results
-            rows = []
-            for date_fmt in date_formats:
+                # First, find the most recent date for the given S/N
+                date_find_query = f"""
+                SELECT DISTINCT Process_{process_num}_DATE 
+                FROM {table_name} 
+                WHERE {sn_column} IN ({placeholders})
+                ORDER BY Process_{process_num}_DATE DESC
+                LIMIT 1
+                """
+                cursor.execute(date_find_query, process_sn_list)
+                date_result = cursor.fetchone()
+                
+                if date_result and date_result[f'Process_{process_num}_DATE']:
+                    actual_date = date_result[f'Process_{process_num}_DATE']
+                    print(f"Using date: {actual_date} (most recent date found for S/N {process_sn_list[0]})")
+                else:
+                    actual_date = csv_date
+                    print(f"No dates found for S/N {process_sn_list[0]}, using original date: {csv_date}")
+                
+                # Build the query with the actual date to use
                 query = f"""
                 SELECT {columns_str}
                 FROM {table_name}
                 WHERE {sn_column} IN ({placeholders}) AND Process_{process_num}_DATE = %s
                 """
-                params = process_sn_list + [date_fmt]
-                print(f"Trying query with date format: {date_fmt}")
+                params = process_sn_list + [actual_date]
+                
+                print(f"\nExecuting query on {table_name}:")
+                print(f"SQL: {query}")
+                print(f"Parameters: {params}")
+                
+                # Execute the query with the actual date
                 cursor.execute(query, params)
-                rows = cursor.fetchall()
-                if rows:
-                    print(f"Found {len(rows)} rows with date format: {date_fmt}")
-                    break
-            
-            # If no rows found with date filter, try without date
-            if not rows:
-                print(f"No rows found with date filter, trying without date")
+            else:
                 query = f"""
                 SELECT {columns_str}
                 FROM {table_name}
                 WHERE {sn_column} IN ({placeholders})
-                ORDER BY Process_{process_num}_DATE DESC
                 """
+                print(f"\nExecuting query on {table_name} (no date filter):")
+                print(f"SQL: {query}")
+                print(f"Parameters: {process_sn_list}")
                 cursor.execute(query, process_sn_list)
-                rows = cursor.fetchall()
-                if rows:
-                    print(f"Found {len(rows)} rows without date filter")
+            
+            rows = cursor.fetchall()
+            print(f"Query returned {len(rows)} rows")
             
             if rows:
                 print(f"Found {len(rows)} matching records in {table_name}")
@@ -1307,51 +1378,16 @@ def process_material_data():
     # Step 1: Get Process S/N from CSV
     print("\n1. Reading CSV data...")
     csv_data = read_csv_with_pandas(FILEPATH)
+    
     if csv_data is None or csv_data.empty:
-        print("No valid data found in CSV. Exiting.")
-        return {'deviation_data': pd.DataFrame()}
+        print("Failed to read CSV data or no data found")
+        return None
     
-    # Get the last row of the CSV data
-    last_row = csv_data.iloc[0]  # read_csv_with_pandas already returns the last row
-    date = last_row['DATE']
-    model_code = last_row['MODEL CODE']
-    process_sn = last_row['PROCESS S/N']
-    sn = last_row['S/N']
-    
-    # Ensure date is in consistent format
-    if date and '/' in date:
-        date = date.replace('/', '-')
-        print(f"Converted date format to YYYY-MM-DD: {date}")
-    
-    print(f"Extracted from CSV - DATE: {date}, MODEL CODE: {model_code}, PROCESS S/N: {process_sn}, S/N: {sn}")
-    
-    # Get process data for materials
-    print("\n2. Querying process data for materials...")
-    print(f"Searching for Process S/N: {process_sn} with DATE: {date}")
-    
-    # Try different date formats if needed
-    date_formats = [
-        date,  # Original format
-        date.replace('-', '/') if date and '-' in date else date,  # YYYY/MM/DD
-        date.split(' ')[0] if date and ' ' in date else date,  # Just date part if timestamp
-    ]
-    
-    material_results = None
-    for date_fmt in date_formats:
-        if not date_fmt:
-            continue
-            
-        print(f"Trying date format: {date_fmt}")
-        material_results = get_process_data_for_materials([process_sn], ['Casing_Block'], date_fmt)
-        
-        # Check if we got any results
-        if material_results and any(process_data for process_data in material_results.values()):
-            print(f"Successfully found data with date format: {date_fmt}")
-            break
-            
-    if not material_results or not any(process_data for process_data in material_results.values()):
-        print("WARNING: Could not find matching data with any date format. Trying without date filter...")
-        material_results = get_process_data_for_materials([process_sn], ['Casing_Block'], None)
+    # Extract Process S/N values and actual S/N values
+    process_sn_list = csv_data['PROCESS S/N'].tolist()
+    sn_list = csv_data['S/N'].tolist()
+    print(f"Process S/N values from CSV: {process_sn_list}")
+    print(f"S/N values from CSV: {sn_list}")
     
     # Step 2: Define target materials
     target_materials = ['Casing_Block']
